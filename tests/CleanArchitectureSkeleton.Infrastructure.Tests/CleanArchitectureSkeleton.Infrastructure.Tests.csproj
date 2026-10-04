@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CleanArchitectureSkeleton.Infrastructure\CleanArchitectureSkeleton.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CleanArchitectureSkeleton.Application\CleanArchitectureSkeleton.Application.csproj" />
+    <ProjectReference Include="..\..\src\CleanArchitectureSkeleton.Domain\CleanArchitectureSkeleton.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

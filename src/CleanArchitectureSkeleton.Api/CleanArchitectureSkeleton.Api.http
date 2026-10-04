@@ -1,0 +1,28 @@
+@host = http://localhost:5170
+
+### Créer une commande
+POST {{host}}/api/orders
+Content-Type: application/json
+
+{
+  "customerName": "Alice Martin",
+  "lines": [
+    { "productName": "Clavier mécanique", "quantity": 1, "unitPrice": 89.90 },
+    { "productName": "Souris", "quantity": 2, "unitPrice": 24.50 }
+  ]
+}
+
+### Lister (pagination + filtre optionnel ?status=Pending)
+GET {{host}}/api/orders?page=1&pageSize=10
+
+### Lire une commande (remplacer l'id)
+GET {{host}}/api/orders/00000000-0000-0000-0000-000000000000
+
+### Confirmer
+POST {{host}}/api/orders/00000000-0000-0000-0000-000000000000/confirm
+
+### Health checks
+GET {{host}}/health
+
+###
+GET {{host}}/alive

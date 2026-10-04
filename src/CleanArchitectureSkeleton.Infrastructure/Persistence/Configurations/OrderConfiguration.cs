@@ -1,0 +1,50 @@
+using CleanArchitectureSkeleton.Domain.Orders;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace CleanArchitectureSkeleton.Infrastructure.Persistence.Configurations;
+
+internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
+{
+    public void Configure(EntityTypeBuilder<Order> builder)
+    {
+        builder.ToTable("Orders");
+        builder.HasKey(o => o.Id);
+
+        // L'identifiant est généré par le Domain (Guid.NewGuid), pas par la base.
+        builder.Property(o => o.Id).ValueGeneratedNever();
+        builder.Property(o => o.CustomerName).IsRequired().HasMaxLength(Order.CustomerNameMaxLength);
+        // L'enum est stocké en texte : plus lisible en base et robuste si on réordonne l'enum.
+        builder.Property(o => o.Status).HasConversion<string>().HasMaxLength(20);
+        // SQLite ne sait ni trier ni comparer les DateTimeOffset (stockés en texte avec leur fuseau) :
+        // on les convertit en ticks UTC (entier), triables et sans ambiguïté de fuseau.
+        builder.Property(o => o.CreatedAt)
+            .HasConversion(v => v.UtcTicks, v => new DateTimeOffset(v, TimeSpan.Zero));
+        builder.Property(o => o.UpdatedAt)
+            .HasConversion(v => v.HasValue ? v.Value.UtcTicks : (long?)null,
+                           v => v.HasValue ? new DateTimeOffset(v.Value, TimeSpan.Zero) : null);
+
+        // Total est une propriété calculée du Domain : on ne la persiste pas.
+        builder.Ignore(o => o.Total);
+
+        // Les lignes sont un "owned type" : leur cycle de vie est lié à la commande (table séparée, clé étrangère, cascade).
+        builder.OwnsMany(o => o.Lines, lines =>
+        {
+            lines.ToTable("OrderLines");
+            lines.WithOwner().HasForeignKey("OrderId");
+            lines.Property<int>("Id");
+            lines.HasKey("Id");
+            lines.Property(l => l.ProductName).IsRequired().HasMaxLength(OrderLine.ProductNameMaxLength);
+            lines.Property(l => l.Quantity);
+            // SQLite n'a pas de type decimal natif : on précise la précision, EF le stocke en TEXT sans perte.
+            lines.Property(l => l.UnitPrice).HasPrecision(18, 2);
+            lines.Ignore(l => l.LineTotal);
+        });
+
+        // EF doit remplir le champ privé _lines plutôt que la propriété en lecture seule.
+        builder.Navigation(o => o.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+
+        // Index pour la liste filtrée par statut et triée par date.
+        builder.HasIndex(o => new { o.Status, o.CreatedAt });
+    }
+}

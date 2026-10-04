@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Les warnings sont traités comme des erreurs (voir Directory.Build.props) : la CI garantit un code propre.
+      - name: Build
+        run: dotnet build CleanArchitectureSkeleton.slnx -c Release
+
+      # Tests unitaires + intégration (SQLite fichier temporaire, aucun service externe requis) + architecture.
+      - name: Test
+        run: dotnet test CleanArchitectureSkeleton.slnx -c Release --no-build --collect:"XPlat Code Coverage" --logger "trx;LogFileName=results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/TestResults/**"

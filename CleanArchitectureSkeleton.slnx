@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CleanArchitectureSkeleton.Api/CleanArchitectureSkeleton.Api.csproj" />
+    <Project Path="src/CleanArchitectureSkeleton.AppHost/CleanArchitectureSkeleton.AppHost.csproj" />
+    <Project Path="src/CleanArchitectureSkeleton.Application/CleanArchitectureSkeleton.Application.csproj" />
+    <Project Path="src/CleanArchitectureSkeleton.Domain/CleanArchitectureSkeleton.Domain.csproj" />
+    <Project Path="src/CleanArchitectureSkeleton.Infrastructure/CleanArchitectureSkeleton.Infrastructure.csproj" />
+    <Project Path="src/CleanArchitectureSkeleton.ServiceDefaults/CleanArchitectureSkeleton.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CleanArchitectureSkeleton.Api.Tests/CleanArchitectureSkeleton.Api.Tests.csproj" />
+    <Project Path="tests/CleanArchitectureSkeleton.Application.Tests/CleanArchitectureSkeleton.Application.Tests.csproj" />
+    <Project Path="tests/CleanArchitectureSkeleton.Architecture.Tests/CleanArchitectureSkeleton.Architecture.Tests.csproj" />
+    <Project Path="tests/CleanArchitectureSkeleton.Domain.Tests/CleanArchitectureSkeleton.Domain.Tests.csproj" />
+    <Project Path="tests/CleanArchitectureSkeleton.Infrastructure.Tests/CleanArchitectureSkeleton.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>
