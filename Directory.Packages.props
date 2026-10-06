@@ -4,7 +4,8 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.6.0" />
+    <!-- 13.6.0 a une régression DCP connue (watch Container/ContainerExec timeout toutes les 60s, cf. microsoft/aspire#20648) : épinglé sur 13.5.4 pour matcher l'AppHost SDK tant qu'aucun patch n'est publié. -->
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.5.4" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
