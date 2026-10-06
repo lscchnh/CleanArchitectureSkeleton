@@ -33,6 +33,62 @@ dotnet test                                                      # 100+ tests, a
 
 Cette règle est **vérifiée automatiquement** par `CleanArchitectureSkeleton.Architecture.Tests` (NetArchTest).
 
+### Modèle de domaine Orders
+
+```mermaid
+classDiagram
+  class Order {
+    +Guid Id
+    +string CustomerName
+    +OrderStatus Status
+    +DateTimeOffset CreatedAt
+    +DateTimeOffset UpdatedAt
+    +IReadOnlyCollection~OrderLine~ Lines
+    +decimal Total
+    +Create(customerName, lines, now) Result~Order~
+    +Update(customerName, lines, now) Result
+    +Confirm(now) Result
+    +Ship(now) Result
+    +Cancel(now) Result
+    +EnsureDeletable() Result
+  }
+
+  class OrderLine {
+    +string ProductName
+    +int Quantity
+    +decimal UnitPrice
+    +decimal LineTotal
+    +Create(productName, quantity, unitPrice) Result~OrderLine~
+  }
+
+  class OrderStatus {
+    <<enumeration>>
+    Pending
+    Confirmed
+    Shipped
+    Cancelled
+  }
+
+  class OrderErrors {
+    <<static>>
+    +NotFound(id) Error
+    +CustomerNameRequired Error
+    +CustomerNameTooLong Error
+    +NoLines Error
+    +ProductNameRequired Error
+    +InvalidQuantity Error
+    +InvalidUnitPrice Error
+    +InvalidTransition(from, to) Error
+    +NotModifiable(status) Error
+    +NotDeletable(status) Error
+  }
+
+  Order "1" *-- "1..*" OrderLine : contient
+  Order --> OrderStatus : statut
+  Order ..> OrderErrors : utilise
+  OrderErrors ..> OrderStatus : erreurs de transition
+```
+
 ## Où trouver chaque exigence
 
 | Concept | Où | Idée clé |
