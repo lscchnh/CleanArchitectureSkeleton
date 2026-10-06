@@ -1,0 +1,182 @@
+@page "/"
+@using CleanArchitectureSkeleton.Application.Orders
+@using CleanArchitectureSkeleton.Domain.Orders
+@using CleanArchitectureSkeleton.Web.Services
+@inject OrdersApiClient Api
+
+<PageTitle>Commandes</PageTitle>
+
+<h1>Commandes</h1>
+
+@if (errorMessage is not null)
+{
+    <p class="error">@errorMessage</p>
+}
+
+<h2>Nouvelle commande</h2>
+
+<EditForm Model="newOrder" OnValidSubmit="CreateOrderAsync">
+    <div class="field">
+        <label>Client</label>
+        <InputText @bind-Value="newOrder.CustomerName" placeholder="Nom du client" />
+    </div>
+
+    <table class="lines">
+        <thead>
+            <tr>
+                <th>Produit</th>
+                <th>Quantité</th>
+                <th>Prix unitaire</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var i = 0; i < newOrder.Lines.Count; i++)
+            {
+                var line = newOrder.Lines[i];
+                <tr>
+                    <td><InputText @bind-Value="line.ProductName" placeholder="Produit" /></td>
+                    <td><InputNumber @bind-Value="line.Quantity" /></td>
+                    <td><InputNumber @bind-Value="line.UnitPrice" /></td>
+                    <td><button type="button" class="link" @onclick="() => newOrder.Lines.Remove(line)">Retirer</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button type="button" @onclick="() => newOrder.Lines.Add(new NewOrderLine())">+ Ajouter une ligne</button>
+    <button type="submit" class="primary" disabled="@isSubmitting">Créer la commande</button>
+</EditForm>
+
+<h2>Commandes existantes</h2>
+
+@if (orders is null)
+{
+    <p>Chargement…</p>
+}
+else if (orders.Items.Count == 0)
+{
+    <p>Aucune commande pour le moment.</p>
+}
+else
+{
+    <table class="orders">
+        <thead>
+            <tr>
+                <th>Client</th>
+                <th>Statut</th>
+                <th>Total</th>
+                <th>Créée le</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var order in orders.Items)
+            {
+                <tr>
+                    <td>@order.CustomerName</td>
+                    <td><span class="badge @order.Status.ToString().ToLowerInvariant()">@order.Status</span></td>
+                    <td>@order.Total.ToString("C")</td>
+                    <td>@order.CreatedAt.LocalDateTime.ToString("g")</td>
+                    <td class="actions">
+                        @if (order.Status == OrderStatus.Pending)
+                        {
+                            <button @onclick="() => RunActionAsync(() => Api.ConfirmAsync(order.Id))">Confirmer</button>
+                        }
+                        @if (order.Status == OrderStatus.Confirmed)
+                        {
+                            <button @onclick="() => RunActionAsync(() => Api.ShipAsync(order.Id))">Expédier</button>
+                        }
+                        @if (order.Status is OrderStatus.Pending or OrderStatus.Confirmed)
+                        {
+                            <button @onclick="() => RunActionAsync(() => Api.CancelAsync(order.Id))">Annuler</button>
+                        }
+                        @if (order.Status != OrderStatus.Shipped)
+                        {
+                            <button class="danger" @onclick="() => DeleteOrderAsync(order.Id)">Supprimer</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private PagedResult<OrderDto>? orders;
+    private string? errorMessage;
+    private bool isSubmitting;
+    private NewOrderModel newOrder = new();
+
+    protected override Task OnInitializedAsync() => LoadOrdersAsync();
+
+    private async Task LoadOrdersAsync()
+    {
+        orders = await Api.ListAsync(page: 1, pageSize: 50, status: null);
+    }
+
+    private async Task CreateOrderAsync()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+        try
+        {
+            var request = new CreateOrderRequest(
+                newOrder.CustomerName,
+                newOrder.Lines.Select(l => new OrderLineRequest(l.ProductName, l.Quantity, l.UnitPrice)).ToList());
+
+            await Api.CreateAsync(request);
+            newOrder = new NewOrderModel();
+            await LoadOrdersAsync();
+        }
+        catch (OrdersApiException ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task RunActionAsync(Func<Task<OrderDto>> action)
+    {
+        errorMessage = null;
+        try
+        {
+            await action();
+            await LoadOrdersAsync();
+        }
+        catch (OrdersApiException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private async Task DeleteOrderAsync(Guid id)
+    {
+        errorMessage = null;
+        try
+        {
+            await Api.DeleteAsync(id);
+            await LoadOrdersAsync();
+        }
+        catch (OrdersApiException ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private sealed class NewOrderModel
+    {
+        public string? CustomerName { get; set; }
+        public List<NewOrderLine> Lines { get; set; } = [new()];
+    }
+
+    private sealed class NewOrderLine
+    {
+        public string? ProductName { get; set; }
+        public int Quantity { get; set; } = 1;
+        public decimal UnitPrice { get; set; }
+    }
+}

@@ -30,4 +30,10 @@ if (bool.TryParse(builder.Configuration["UseRedis"], out var useRedis) && useRed
     api.WithReference(redis).WaitFor(redis);
 }
 
+// Interface Blazor pour gérer les commandes : elle appelle l'Api via le service discovery d'Aspire ("api").
+builder.AddProject<Projects.CleanArchitectureSkeleton_Web>("web")
+    .WithReference(api)
+    .WaitFor(api)
+    .WithExternalHttpEndpoints();
+
 builder.Build().Run();

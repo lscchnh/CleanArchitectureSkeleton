@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CleanArchitectureSkeleton.Api\CleanArchitectureSkeleton.Api.csproj" />
+    <ProjectReference Include="..\CleanArchitectureSkeleton.Web\CleanArchitectureSkeleton.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

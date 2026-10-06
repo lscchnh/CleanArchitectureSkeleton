@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Réutilise les DTOs et le enum OrderStatus de l'Application : le contrat de l'API ne doit pas être redupliqué à la main. -->
+    <ProjectReference Include="..\CleanArchitectureSkeleton.Application\CleanArchitectureSkeleton.Application.csproj" />
+    <ProjectReference Include="..\CleanArchitectureSkeleton.ServiceDefaults\CleanArchitectureSkeleton.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

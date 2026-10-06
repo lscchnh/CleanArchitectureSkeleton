@@ -6,6 +6,7 @@
     <Project Path="src/CleanArchitectureSkeleton.Domain/CleanArchitectureSkeleton.Domain.csproj" />
     <Project Path="src/CleanArchitectureSkeleton.Infrastructure/CleanArchitectureSkeleton.Infrastructure.csproj" />
     <Project Path="src/CleanArchitectureSkeleton.ServiceDefaults/CleanArchitectureSkeleton.ServiceDefaults.csproj" />
+    <Project Path="src/CleanArchitectureSkeleton.Web/CleanArchitectureSkeleton.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/CleanArchitectureSkeleton.Api.Tests/CleanArchitectureSkeleton.Api.Tests.csproj" />

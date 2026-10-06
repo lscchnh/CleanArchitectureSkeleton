@@ -27,7 +27,7 @@ dotnet test                                                      # 100+ tests, a
 |---|---|---|
 | `Domain` | Entités riches (`Order`, `OrderLine`), règles métier, machine à états, pattern **Result** (`Result`, `Error`) | rien |
 | `Application` | Cas d'usage (`OrderService`), DTOs, **ports** (`IOrderRepository`, `IUnitOfWork`, `ICacheService`) | Domain |
-| `Infrastructure` | Adaptateurs : EF Core + SQLite, transaction + verrou pessimiste, HybridCache, pipeline Polly, health checks | Application |
+| `Infrastructure` | Adaptateurs : EF Core + SQLite, transaction + verrou pessimiste, HybridCache, pipeline Polly, health checks | Application, Domain |
 | `Api` | Minimal API, rate limiting, gestion d'exceptions, mapping `Result` → HTTP, composition root | tout (pour câbler) |
 | `AppHost` / `ServiceDefaults` | Orchestration Aspire, OpenTelemetry, health checks par défaut | — |
 
