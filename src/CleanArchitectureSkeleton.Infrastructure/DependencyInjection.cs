@@ -6,6 +6,7 @@ using CleanArchitectureSkeleton.Infrastructure.Resilience;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Polly;
 using Polly.CircuitBreaker;
 
@@ -38,7 +39,7 @@ public static class DependencyInjection
         services.AddResiliencePipeline(DatabaseResiliencePipeline.Name, (builder, context) =>
         {
             var options = context.ServiceProvider
-                .GetRequiredService<Microsoft.Extensions.Options.IOptions<DatabaseResilienceOptions>>().Value;
+                .GetRequiredService<IOptions<DatabaseResilienceOptions>>().Value;
             DatabaseResiliencePipeline.Configure(builder, options, stateProvider);
         });
 

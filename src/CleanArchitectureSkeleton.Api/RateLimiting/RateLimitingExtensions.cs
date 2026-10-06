@@ -1,5 +1,4 @@
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace CleanArchitectureSkeleton.Api.RateLimiting;
 
@@ -56,6 +55,7 @@ public static class RateLimitingExtensions
                         QueueLimit = 0, // pas de file d'attente : on rejette tout de suite (fail fast).
                     }));
 
+            // OnRejected = callback pour personnaliser la réponse HTTP 429 Too Many Requests.
             limiter.OnRejected = async (context, cancellationToken) =>
             {
                 if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
