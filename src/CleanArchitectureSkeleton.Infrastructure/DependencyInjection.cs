@@ -74,6 +74,9 @@ public static class DependencyInjection
             });
             services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
             services.AddHostedService<OutboxProcessor>();
+            // Consommateur "métier" : stocke chaque event traité dans ProcessedMessages (idempotent, ordonné).
+            services.AddScoped<IProcessedMessageQueries, ProcessedMessageQueries>();
+            services.AddHostedService<OutboxConsumer>();
         }
 
         // ── Health checks 

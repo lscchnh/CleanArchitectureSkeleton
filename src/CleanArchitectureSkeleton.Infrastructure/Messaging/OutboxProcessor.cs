@@ -13,7 +13,7 @@ namespace CleanArchitectureSkeleton.Infrastructure.Messaging;
 /// si la publication échoue, le message reste non traité et sera retenté au prochain tick
 /// (pas de DLQ ni de backoff exponentiel ici, pour rester lisible dans un projet pédagogique).
 /// </summary>
-internal sealed class OutboxProcessor(
+internal sealed partial class OutboxProcessor(
     IServiceScopeFactory scopeFactory,
     IEventPublisher publisher,
     ILogger<OutboxProcessor> logger) : BackgroundService
@@ -56,19 +56,28 @@ internal sealed class OutboxProcessor(
             try
             {
                 // Routing key = type de l'événement (ex: "OrderCreatedDomainEvent") : voir RabbitMqEventPublisher.
-                await publisher.PublishAsync(message.Type, message.Content, cancellationToken);
+                // messageId = Id de ce message Outbox : propagé jusqu'au consumer pour l'idempotence (ProcessedMessages).
+                await publisher.PublishAsync(message.Id, message.Type, message.Content, cancellationToken);
                 message.ProcessedOnUtc = DateTimeOffset.UtcNow;
                 message.Error = null;
-                logger.LogInformation("Event {EventType} ({MessageId}) publié sur RabbitMQ.", message.Type, message.Id);
+                LogPublished(logger, message.Type, message.Id);
             }
             catch (Exception ex)
             {
                 // On n'interrompt pas le lot : un message en échec ne doit pas bloquer les suivants.
                 message.Error = ex.Message;
-                logger.LogWarning(ex, "Échec de publication de l'event {EventType} ({MessageId}), nouvelle tentative au prochain tick.", message.Type, message.Id);
+                LogPublishFailed(logger, ex, message.Type, message.Id);
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    // LoggerMessage source-generated : plus performant qu'un appel direct LogInformation/LogWarning
+    // (pas de boxing des arguments quand le niveau de log est désactivé).
+    [LoggerMessage(Level = LogLevel.Information, Message = "Event {EventType} ({MessageId}) publié sur RabbitMQ.")]
+    private static partial void LogPublished(ILogger logger, string eventType, Guid messageId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Échec de publication de l'event {EventType} ({MessageId}), nouvelle tentative au prochain tick.")]
+    private static partial void LogPublishFailed(ILogger logger, Exception exception, string eventType, Guid messageId);
 }

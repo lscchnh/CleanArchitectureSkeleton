@@ -15,6 +15,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Table d'Outbox : voir <see cref="OutboxMessage"/> pour le rôle exact.</summary>
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    /// <summary>Trace des events déjà consommés : voir <see cref="ProcessedMessage"/> (idempotence du consumer).</summary>
+    public DbSet<ProcessedMessage> ProcessedMessages => Set<ProcessedMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         // Le mapping est rangé dans des classes IEntityTypeConfiguration, pour ne pas polluer les entités du Domain
         // avec des attributs d'infrastructure ([Table], [MaxLength]...).

@@ -32,6 +32,18 @@ var redis = builder.AddRedis("redis")
 
 api.WithReference(redis).WaitFor(redis);
 
+// RabbitMQ est OBLIGATOIRE (nécessite Docker) : transport utilisé pour SIMULER l'envoi d'un event
+// à chaque écriture en base (pattern Outbox, voir EfUnitOfWork + OutboxProcessor dans Infrastructure).
+// L'UI de management (port 15672, identifiants guest/guest en local) permet d'observer les messages publiés.
+var rabbitMq = builder.AddRabbitMQ("rabbitmq")
+    .WithImage("rabbitmq")
+    .WithImageTag("3-management")
+    // Volume nommé : les exchanges/queues déclarés survivent aux redémarrages de l'AppHost.
+    .WithDataVolume("cleanarchitectureskeleton-rabbitmq-data")
+    .WithManagementPlugin();
+
+api.WithReference(rabbitMq).WaitFor(rabbitMq);
+
 // Interface Blazor pour gérer les commandes : elle appelle l'Api via le service discovery d'Aspire ("api").
 builder.AddProject<Projects.CleanArchitectureSkeleton_Web>("web")
     .WithReference(api)

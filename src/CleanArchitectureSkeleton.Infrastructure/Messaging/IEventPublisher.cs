@@ -6,5 +6,9 @@ namespace CleanArchitectureSkeleton.Infrastructure.Messaging;
 /// </summary>
 public interface IEventPublisher
 {
-    Task PublishAsync(string routingKey, string payload, CancellationToken cancellationToken);
+    /// <summary>
+    /// <paramref name="messageId"/> est propagé tel quel dans les propriétés AMQP (MessageId) : c'est la clé
+    /// que l'OutboxConsumer réutilise ensuite pour garantir l'idempotence côté ProcessedMessages.
+    /// </summary>
+    Task PublishAsync(Guid messageId, string routingKey, string payload, CancellationToken cancellationToken);
 }

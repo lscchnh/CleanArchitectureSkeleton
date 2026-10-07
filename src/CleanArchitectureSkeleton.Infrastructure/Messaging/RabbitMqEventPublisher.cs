@@ -13,7 +13,7 @@ internal sealed class RabbitMqEventPublisher(IConnection connection) : IEventPub
 {
     private const string ExchangeName = "orders-events";
 
-    public async Task PublishAsync(string routingKey, string payload, CancellationToken cancellationToken)
+    public async Task PublishAsync(Guid messageId, string routingKey, string payload, CancellationToken cancellationToken)
     {
         // Un canal par publication : pas thread-safe à partager entre appels concurrents en v7.
         // C'est volontairement simple ici (projet pédagogique) ; un pool de canaux serait la version "production".
@@ -22,10 +22,19 @@ internal sealed class RabbitMqEventPublisher(IConnection connection) : IEventPub
         await channel.ExchangeDeclareAsync(ExchangeName, ExchangeType.Topic, durable: true, cancellationToken: cancellationToken);
 
         var body = System.Text.Encoding.UTF8.GetBytes(payload);
+        // MessageId = Id du message Outbox d'origine : c'est ce que l'OutboxConsumer relira pour
+        // dédoublonner (voir ProcessedMessage). Persistent = true : le message survit à un redémarrage de RabbitMQ.
+        var properties = new BasicProperties
+        {
+            MessageId = messageId.ToString(),
+            Persistent = true,
+        };
+
         await channel.BasicPublishAsync(
             exchange: ExchangeName,
             routingKey: routingKey,
             mandatory: false,
+            basicProperties: properties,
             body: body,
             cancellationToken: cancellationToken);
     }
