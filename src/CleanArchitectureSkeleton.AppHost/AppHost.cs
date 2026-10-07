@@ -21,14 +21,16 @@ var api = builder.AddProject<Projects.CleanArchitectureSkeleton_Api>("api")
     .WithHttpHealthCheck("/health")
     .WithExternalHttpEndpoints();
 
-// Redis est OPTIONNEL (nécessite Docker) : `dotnet run ... --UseRedis=true`.
-// Avec Redis, le cache L2 est partagé entre les réplicas ⇒ une invalidation faite par l'une profite à toutes.
-// Sans Redis, chaque instance garde son cache mémoire local (durée de vie L1 courte pour limiter l'incohérence).
-if (bool.TryParse(builder.Configuration["UseRedis"], out var useRedis) && useRedis)
-{
-    var redis = builder.AddRedis("redis");
-    api.WithReference(redis).WaitFor(redis);
-}
+// Redis est OBLIGATOIRE (nécessite Docker) : Aspire démarre le conteneur `redis` au lancement.
+// Le cache L2 est partagé entre les réplicas ⇒ une invalidation faite par l'une profite à toutes.
+var redis = builder.AddRedis("redis")
+    // Image Docker épinglée pour un comportement reproductible entre postes/CI.
+    .WithImage("redis")
+    .WithImageTag("7.4")
+    // Volume nommé : le cache survit aux redémarrages de l'AppHost.
+    .WithDataVolume("cleanarchitectureskeleton-redis-data");
+
+api.WithReference(redis).WaitFor(redis);
 
 // Interface Blazor pour gérer les commandes : elle appelle l'Api via le service discovery d'Aspire ("api").
 builder.AddProject<Projects.CleanArchitectureSkeleton_Web>("web")
