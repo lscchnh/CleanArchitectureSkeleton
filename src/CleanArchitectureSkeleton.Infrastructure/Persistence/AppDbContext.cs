@@ -1,4 +1,5 @@
 using CleanArchitectureSkeleton.Domain.Orders;
+using CleanArchitectureSkeleton.Infrastructure.Persistence.Outbox;
 using Microsoft.EntityFrameworkCore;
 
 namespace CleanArchitectureSkeleton.Infrastructure.Persistence;
@@ -10,6 +11,9 @@ namespace CleanArchitectureSkeleton.Infrastructure.Persistence;
 public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Order> Orders => Set<Order>();
+
+    /// <summary>Table d'Outbox : voir <see cref="OutboxMessage"/> pour le rôle exact.</summary>
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         // Le mapping est rangé dans des classes IEntityTypeConfiguration, pour ne pas polluer les entités du Domain

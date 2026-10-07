@@ -1,5 +1,8 @@
+using System.Text.Json;
 using CleanArchitectureSkeleton.Application.Abstractions;
 using CleanArchitectureSkeleton.Domain.Common;
+using CleanArchitectureSkeleton.Domain.Orders;
+using CleanArchitectureSkeleton.Infrastructure.Persistence.Outbox;
 using CleanArchitectureSkeleton.Infrastructure.Resilience;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -71,6 +74,12 @@ internal sealed class EfUnitOfWork(AppDbContext db, ResiliencePipelineProvider<s
                     return result;
                 }
 
+                // Pattern Transactional Outbox : les événements levés par les agrégats modifiés sont copiés
+                // dans la table OutboxMessages AVANT SaveChangesAsync, donc dans LA MÊME transaction SQLite
+                // que l'écriture métier. Un BackgroundService séparé (OutboxProcessor) les publiera ensuite
+                // sur RabbitMQ de façon asynchrone, hors du chemin critique de la requête.
+                EnqueueDomainEventsToOutbox();
+
                 await db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
                 return result;
@@ -84,6 +93,37 @@ internal sealed class EfUnitOfWork(AppDbContext db, ResiliencePipelineProvider<s
         finally
         {
             await connection.CloseAsync();
+        }
+    }
+
+    /// <summary>
+    /// Parcourt les agrégats <see cref="Order"/> suivis par le ChangeTracker (ajoutés ou modifiés) et transforme
+    /// chacun de leurs <c>DomainEvents</c> en une ligne <see cref="OutboxMessage"/>. Le nom du type concret
+    /// (ex: "OrderCreatedDomainEvent") est conservé comme discriminant : l'OutboxProcessor n'a donc pas besoin
+    /// de connaître le Domain pour router le message, seulement de propager ce nom en routing key RabbitMQ.
+    /// </summary>
+    private void EnqueueDomainEventsToOutbox()
+    {
+        var orders = db.ChangeTracker.Entries<Order>()
+            .Where(e => e.State is EntityState.Added or EntityState.Modified)
+            .Select(e => e.Entity)
+            .Where(order => order.DomainEvents.Count > 0)
+            .ToList();
+
+        foreach (var order in orders)
+        {
+            foreach (var domainEvent in order.DomainEvents)
+            {
+                db.OutboxMessages.Add(new OutboxMessage
+                {
+                    Id = Guid.NewGuid(),
+                    Type = domainEvent.GetType().Name,
+                    Content = JsonSerializer.Serialize(domainEvent, domainEvent.GetType()),
+                    OccurredOnUtc = domainEvent.OccurredOnUtc,
+                });
+            }
+
+            order.ClearDomainEvents();
         }
     }
 }

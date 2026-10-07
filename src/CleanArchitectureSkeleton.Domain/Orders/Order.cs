@@ -1,4 +1,5 @@
 using CleanArchitectureSkeleton.Domain.Common;
+using CleanArchitectureSkeleton.Domain.Orders.Events;
 
 namespace CleanArchitectureSkeleton.Domain.Orders;
 
@@ -13,6 +14,11 @@ public sealed class Order
     public const int CustomerNameMaxLength = 200;
 
     private readonly List<OrderLine> _lines = [];
+
+    // Accumule les événements levés pendant l'exécution d'une méthode métier de CET agrégat.
+    // Ils ne sont PAS persistés directement ici : c'est EfUnitOfWork qui les lit après un succès
+    // et les transforme en lignes d'Outbox, dans la même transaction que l'écriture de l'agrégat.
+    private readonly List<IDomainEvent> _domainEvents = [];
 
     // Constructeur privé sans paramètre réservé à EF Core (matérialisation depuis la base).
     private Order()
@@ -29,6 +35,12 @@ public sealed class Order
     public IReadOnlyCollection<OrderLine> Lines => _lines.AsReadOnly();
 
     public decimal Total => _lines.Sum(l => l.LineTotal);
+
+    /// <summary>Lecture seule : seule l'Unité de travail (Infrastructure) peut les collecter puis les vider.</summary>
+    public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
+
+    /// <summary>Appelée par EfUnitOfWork une fois les événements copiés dans l'Outbox (évite les doublons si le même agrégat est réutilisé).</summary>
+    public void ClearDomainEvents() => _domainEvents.Clear();
 
     /// <summary>
     /// Fabrique : seule façon de créer une commande valide.
@@ -50,6 +62,7 @@ public sealed class Order
             CreatedAt = now,
         };
         order._lines.AddRange(lines);
+        order._domainEvents.Add(new OrderCreatedDomainEvent(order.Id, order.CustomerName, order.Total, now));
         return order;
     }
 
@@ -72,14 +85,18 @@ public sealed class Order
         _lines.Clear();
         _lines.AddRange(lineList);
         UpdatedAt = now;
+        _domainEvents.Add(new OrderUpdatedDomainEvent(Id, CustomerName, Total, now));
         return Result.Success();
     }
 
-    public Result Confirm(DateTimeOffset now) => TransitionTo(OrderStatus.Confirmed, now);
+    public Result Confirm(DateTimeOffset now) =>
+        TransitionTo(OrderStatus.Confirmed, now, id => new OrderConfirmedDomainEvent(id, now));
 
-    public Result Ship(DateTimeOffset now) => TransitionTo(OrderStatus.Shipped, now);
+    public Result Ship(DateTimeOffset now) =>
+        TransitionTo(OrderStatus.Shipped, now, id => new OrderShippedDomainEvent(id, now));
 
-    public Result Cancel(DateTimeOffset now) => TransitionTo(OrderStatus.Cancelled, now);
+    public Result Cancel(DateTimeOffset now) =>
+        TransitionTo(OrderStatus.Cancelled, now, id => new OrderCancelledDomainEvent(id, now));
 
     /// <summary>Règle métier : on ne supprime que ce qui n'a pas encore été expédié.</summary>
     public Result EnsureDeletable() =>
@@ -87,7 +104,7 @@ public sealed class Order
             ? Result.Failure(OrderErrors.NotDeletable(Status))
             : Result.Success();
 
-    private Result TransitionTo(OrderStatus target, DateTimeOffset now)
+    private Result TransitionTo(OrderStatus target, DateTimeOffset now, Func<Guid, IDomainEvent> eventFactory)
     {
         // Table des transitions autorisées (machine à états).
         var allowed = (Status, target) switch
@@ -106,6 +123,7 @@ public sealed class Order
 
         Status = target;
         UpdatedAt = now;
+        _domainEvents.Add(eventFactory(Id));
         return Result.Success();
     }
 

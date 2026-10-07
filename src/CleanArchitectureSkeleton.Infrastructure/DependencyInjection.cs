@@ -1,6 +1,7 @@
 using CleanArchitectureSkeleton.Application.Abstractions;
 using CleanArchitectureSkeleton.Infrastructure.Caching;
 using CleanArchitectureSkeleton.Infrastructure.HealthChecks;
+using CleanArchitectureSkeleton.Infrastructure.Messaging;
 using CleanArchitectureSkeleton.Infrastructure.Persistence;
 using CleanArchitectureSkeleton.Infrastructure.Resilience;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.CircuitBreaker;
+using RabbitMQ.Client;
 
 namespace CleanArchitectureSkeleton.Infrastructure;
 
@@ -16,6 +18,7 @@ public static class DependencyInjection
 {
     public const string DatabaseConnectionName = "orders-db";
     public const string RedisConnectionName = "redis";
+    public const string RabbitMqConnectionName = "rabbitmq";
 
     /// <summary>Enregistre tout ce qui touche au monde extérieur : base, cache, résilience, health checks.</summary>
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
@@ -55,7 +58,25 @@ public static class DependencyInjection
         services.AddHybridCache();
         services.AddSingleton<ICacheService, HybridCacheService>();
 
-        // ── Health checks ────────────────────────────────────────────────────────────
+        // ── Simulation d'events (pattern Outbox + RabbitMQ) ─────────────────────────────────────────
+        // Chaque écriture métier (Order créée/modifiée/confirmée/expédiée/annulée) dépose un event dans
+        // la table OutboxMessages (voir EfUnitOfWork). RabbitMQ (conteneur Docker fourni par l'AppHost)
+        // n'est QUE le transport : on simule ainsi l'envoi d'un event à chaque écriture, sans coupler
+        // directement la transaction métier au broker (si RabbitMQ est down, les écritures continuent ;
+        // l'OutboxProcessor rattrapera la publication plus tard).
+        var rabbitMqConnectionString = configuration.GetConnectionString(RabbitMqConnectionName);
+        if (!string.IsNullOrWhiteSpace(rabbitMqConnectionString))
+        {
+            services.AddSingleton<IConnection>(_ =>
+            {
+                var factory = new ConnectionFactory { Uri = new Uri(rabbitMqConnectionString) };
+                return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+            });
+            services.AddSingleton<IEventPublisher, RabbitMqEventPublisher>();
+            services.AddHostedService<OutboxProcessor>();
+        }
+
+        // ── Health checks 
         // Tag "ready"  : l'instance peut-elle servir du trafic ? (base joignable) → sonde de readiness.
         // Le tag "live" (défini côté API) ne vérifie rien d'externe : "le processus répond-il ?"
         services.AddHealthChecks()

@@ -27,6 +27,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         // Total est une propriété calculée du Domain : on ne la persiste pas.
         builder.Ignore(o => o.Total);
 
+        // Les DomainEvents sont transitoires (vidés par EfUnitOfWork après copie en Outbox) : jamais persistés.
+        builder.Ignore(o => o.DomainEvents);
+
         // Les lignes sont un "owned type" : leur cycle de vie est lié à la commande (table séparée, clé étrangère, cascade).
         builder.OwnsMany(o => o.Lines, lines =>
         {
