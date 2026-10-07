@@ -4,12 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace CleanArchitectureSkeleton.Infrastructure.Tests;
 
-/// <summary>Tests d'INTÉGRATION : repository + EF Core + vraie base SQLite (migrations appliquées).</summary>
+/// <summary>Tests d'INTÉGRATION : repository + EF Core + vraie base PostgreSQL (migrations appliquées).</summary>
 public class OrderRepositoryTests : IAsyncLifetime
 {
-    private SqliteTestHost _host = null!;
+    private PostgresTestHost _host = null!;
 
-    public async Task InitializeAsync() => _host = await SqliteTestHost.CreateAsync();
+    public async Task InitializeAsync() => _host = await PostgresTestHost.CreateAsync();
 
     public async Task DisposeAsync() => await _host.DisposeAsync();
 

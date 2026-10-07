@@ -46,6 +46,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapOrderEndpoints();
+app.MapProcessedMessageEndpoints();
 app.MapDefaultEndpoints(); // /health (readiness) et /alive (liveness)
 
 app.Run();

@@ -6,9 +6,9 @@ namespace CleanArchitectureSkeleton.Infrastructure.Tests;
 
 public class CacheAndHealthTests : IAsyncLifetime
 {
-    private SqliteTestHost _host = null!;
+    private PostgresTestHost _host = null!;
 
-    public async Task InitializeAsync() => _host = await SqliteTestHost.CreateAsync();
+    public async Task InitializeAsync() => _host = await PostgresTestHost.CreateAsync();
 
     public async Task DisposeAsync() => await _host.DisposeAsync();
 

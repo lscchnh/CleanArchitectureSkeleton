@@ -18,8 +18,8 @@ internal sealed class ProcessedMessageConfiguration : IEntityTypeConfiguration<P
         builder.Property(m => m.Type).IsRequired().HasMaxLength(200);
         builder.Property(m => m.Content).IsRequired();
 
-        builder.Property(m => m.ProcessedOnUtc)
-            .HasConversion(v => v.UtcTicks, v => new DateTimeOffset(v, TimeSpan.Zero));
+        // PostgreSQL gère nativement DateTimeOffset (colonne timestamptz) : aucune conversion nécessaire.
+        builder.Property(m => m.ProcessedOnUtc);
 
         // Sert à trier "les plus récents d'abord" pour l'encart Blazor sans scanner toute la table.
         builder.HasIndex(m => m.ProcessedOnUtc);

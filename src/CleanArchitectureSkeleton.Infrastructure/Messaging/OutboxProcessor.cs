@@ -8,7 +8,7 @@ namespace CleanArchitectureSkeleton.Infrastructure.Messaging;
 
 /// <summary>
 /// Second temps du pattern Outbox : un <see cref="BackgroundService"/> qui, toutes les <see cref="PollingInterval"/>,
-/// lit un lot de <c>OutboxMessages</c> non traités, les publie sur RabbitMQ (via <see cref="IEventPublisher"/>),
+/// lit un lot de <c>OutboxMessages</c> non traités, les publie sur Kafka (via <see cref="IEventPublisher"/>),
 /// puis marque <c>ProcessedOnUtc</c>. C'est volontairement du "at-least-once" + relecture simple :
 /// si la publication échoue, le message reste non traité et sera retenté au prochain tick
 /// (pas de DLQ ni de backoff exponentiel ici, pour rester lisible dans un projet pédagogique).
@@ -55,7 +55,7 @@ internal sealed partial class OutboxProcessor(
         {
             try
             {
-                // Routing key = type de l'événement (ex: "OrderCreatedDomainEvent") : voir RabbitMqEventPublisher.
+                // Routing key = type de l'événement (ex: "OrderCreatedDomainEvent") : voir KafkaEventPublisher.
                 // messageId = Id de ce message Outbox : propagé jusqu'au consumer pour l'idempotence (ProcessedMessages).
                 await publisher.PublishAsync(message.Id, message.Type, message.Content, cancellationToken);
                 message.ProcessedOnUtc = DateTimeOffset.UtcNow;
@@ -75,7 +75,7 @@ internal sealed partial class OutboxProcessor(
 
     // LoggerMessage source-generated : plus performant qu'un appel direct LogInformation/LogWarning
     // (pas de boxing des arguments quand le niveau de log est désactivé).
-    [LoggerMessage(Level = LogLevel.Information, Message = "Event {EventType} ({MessageId}) publié sur RabbitMQ.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Event {EventType} ({MessageId}) publié sur Kafka.")]
     private static partial void LogPublished(ILogger logger, string eventType, Guid messageId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Échec de publication de l'event {EventType} ({MessageId}), nouvelle tentative au prochain tick.")]

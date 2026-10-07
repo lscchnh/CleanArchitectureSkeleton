@@ -1,21 +1,21 @@
 using CleanArchitectureSkeleton.Infrastructure.HealthChecks;
 using CleanArchitectureSkeleton.Infrastructure.Resilience;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
 using Polly;
 using Polly.CircuitBreaker;
 
 namespace CleanArchitectureSkeleton.Infrastructure.Tests;
 
 /// <summary>
-/// Tests du pipeline Polly (retry + circuit breaker). On simule des pannes en levant de vraies SqliteException
-/// avec les codes SQLite (5 = BUSY transitoire, 19 = violation de contrainte permanente).
+/// Tests du pipeline Polly (retry + circuit breaker). On simule des pannes en levant de vraies PostgresException
+/// avec des codes SQLSTATE (40001 = serialization_failure transitoire, 23505 = violation de contrainte permanente).
 /// </summary>
 public class ResilienceTests
 {
-    private const int Busy = 5;
-    private const int Constraint = 19;
+    private const string Busy = "40001"; // serialization_failure
+    private const string Constraint = "23505"; // unique_violation
 
     private static readonly DatabaseResilienceOptions FastOptions = new()
     {
@@ -35,17 +35,18 @@ public class ResilienceTests
         return (builder.Build(), state);
     }
 
-    private static SqliteException Failure(int code) => new("simulated", code);
+    private static PostgresException Failure(string sqlState) =>
+        new(messageText: "simulated", severity: "ERROR", invariantSeverity: "ERROR", sqlState: sqlState);
 
     // ── TransientErrorDetector ──────────────────────────────────────────────────
 
     [Theory]
     [InlineData(Busy, true)]
-    [InlineData(6, true)]
-    [InlineData(10, true)]
+    [InlineData("40P01", true)] // deadlock_detected
+    [InlineData("08006", true)] // connection_failure
     [InlineData(Constraint, false)]
-    [InlineData(1, false)] // erreur SQL générique : permanente
-    public void Detector_classifies_sqlite_error_codes(int code, bool expected)
+    [InlineData("42601", false)] // erreur SQL générique : permanente
+    public void Detector_classifies_postgres_error_codes(string code, bool expected)
     {
         Assert.Equal(expected, TransientErrorDetector.IsTransient(Failure(code)));
     }
@@ -84,7 +85,7 @@ public class ResilienceTests
         var (pipeline, _) = Build();
         var attempts = 0;
 
-        await Assert.ThrowsAsync<SqliteException>(async () => await pipeline.ExecuteAsync<string>(_ =>
+        await Assert.ThrowsAsync<PostgresException>(async () => await pipeline.ExecuteAsync<string>(_ =>
         {
             attempts++;
             throw Failure(Busy);
@@ -99,7 +100,7 @@ public class ResilienceTests
         var (pipeline, _) = Build();
         var attempts = 0;
 
-        await Assert.ThrowsAsync<SqliteException>(async () => await pipeline.ExecuteAsync<string>(_ =>
+        await Assert.ThrowsAsync<PostgresException>(async () => await pipeline.ExecuteAsync<string>(_ =>
         {
             attempts++;
             throw Failure(Constraint);
@@ -124,7 +125,7 @@ public class ResilienceTests
 
         for (var i = 0; i < 4; i++)
         {
-            await Assert.ThrowsAsync<SqliteException>(async () => await pipeline.ExecuteAsync<string>(_ =>
+            await Assert.ThrowsAsync<PostgresException>(async () => await pipeline.ExecuteAsync<string>(_ =>
             {
                 calls++;
                 throw Failure(Busy);
@@ -155,7 +156,7 @@ public class ResilienceTests
 
         for (var i = 0; i < 2; i++)
         {
-            await Assert.ThrowsAsync<SqliteException>(async () =>
+            await Assert.ThrowsAsync<PostgresException>(async () =>
                 await pipeline.ExecuteAsync<string>(_ => throw Failure(Busy)));
         }
 
@@ -175,7 +176,7 @@ public class ResilienceTests
 
         for (var i = 0; i < 10; i++)
         {
-            await Assert.ThrowsAsync<SqliteException>(async () =>
+            await Assert.ThrowsAsync<PostgresException>(async () =>
                 await pipeline.ExecuteAsync<string>(_ => throw Failure(Constraint)));
         }
 
@@ -199,7 +200,7 @@ public class ResilienceTests
 
         for (var i = 0; i < 2; i++)
         {
-            await Assert.ThrowsAsync<SqliteException>(async () =>
+            await Assert.ThrowsAsync<PostgresException>(async () =>
                 await pipeline.ExecuteAsync<string>(_ => throw Failure(Busy)));
         }
 

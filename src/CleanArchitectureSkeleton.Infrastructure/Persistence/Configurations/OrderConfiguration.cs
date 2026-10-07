@@ -16,13 +16,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.CustomerName).IsRequired().HasMaxLength(Order.CustomerNameMaxLength);
         // L'enum est stocké en texte : plus lisible en base et robuste si on réordonne l'enum.
         builder.Property(o => o.Status).HasConversion<string>().HasMaxLength(20);
-        // SQLite ne sait ni trier ni comparer les DateTimeOffset (stockés en texte avec leur fuseau) :
-        // on les convertit en ticks UTC (entier), triables et sans ambiguïté de fuseau.
-        builder.Property(o => o.CreatedAt)
-            .HasConversion(v => v.UtcTicks, v => new DateTimeOffset(v, TimeSpan.Zero));
-        builder.Property(o => o.UpdatedAt)
-            .HasConversion(v => v.HasValue ? v.Value.UtcTicks : (long?)null,
-                           v => v.HasValue ? new DateTimeOffset(v.Value, TimeSpan.Zero) : null);
+        // PostgreSQL gère nativement DateTimeOffset (colonne timestamptz) : aucune conversion nécessaire.
 
         // Total est une propriété calculée du Domain : on ne la persiste pas.
         builder.Ignore(o => o.Total);
@@ -39,7 +33,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             lines.HasKey("Id");
             lines.Property(l => l.ProductName).IsRequired().HasMaxLength(OrderLine.ProductNameMaxLength);
             lines.Property(l => l.Quantity);
-            // SQLite n'a pas de type decimal natif : on précise la précision, EF le stocke en TEXT sans perte.
+            // decimal(18,2) natif PostgreSQL : pas de perte de précision.
             lines.Property(l => l.UnitPrice).HasPrecision(18, 2);
             lines.Ignore(l => l.LineTotal);
         });

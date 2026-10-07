@@ -19,7 +19,7 @@ jobs:
       - name: Build
         run: dotnet build CleanArchitectureSkeleton.slnx -c Release
 
-      # Tests unitaires + intégration (SQLite fichier temporaire, aucun service externe requis) + architecture.
+      # Tests unitaires + intégration (conteneurs PostgreSQL via Testcontainers, Docker disponible nativement sur les runners GitHub) + architecture.
       - name: Test
         run: dotnet test CleanArchitectureSkeleton.slnx -c Release --no-build --collect:"XPlat Code Coverage" --logger "trx;LogFileName=results.trx"
 

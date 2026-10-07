@@ -8,14 +8,14 @@ Cas d'usage fil rouge : un **CRUD de commandes (Orders)**, volontairement « ove
 ## Démarrage rapide
 
 ```bash
-dotnet run --project src/CleanArchitectureSkeleton.AppHost      # Aspire : 2 réplicas de l'API + dashboard
-dotnet run --project src/CleanArchitectureSkeleton.Api          # ou l'API seule (http://localhost:5170)
-dotnet test                                                      # 100+ tests, aucune dépendance externe
+dotnet run --project src/CleanArchitectureSkeleton.AppHost      # Aspire : 2 réplicas de l'API + dashboard (Docker requis : PostgreSQL, Redis, Kafka)
+dotnet run --project src/CleanArchitectureSkeleton.Api          # ou l'API seule (http://localhost:5170) — nécessite un PostgreSQL accessible
+dotnet test                                                      # 100+ tests ; Infrastructure.Tests/Api.Tests démarrent des conteneurs PostgreSQL (Docker requis)
 ```
 
 * Documentation interactive de l'API : `/scalar/v1` (en Development) — fichier `.http` fourni dans `src/CleanArchitectureSkeleton.Api`.
-* Redis optionnel (nécessite Docker) comme cache L2 partagé entre réplicas : `dotnet run --project src/CleanArchitectureSkeleton.AppHost -- --UseRedis=true`.
-* Prérequis : SDK .NET 10. L'orchestration Aspire (AppHost) utilise le dashboard Aspire ; Docker n'est requis que pour Redis.
+* Redis (cache L2 partagé entre réplicas) et Kafka (transport des events Outbox) sont OBLIGATOIRES et démarrés automatiquement par Aspire.
+* Prérequis : SDK .NET 10 **et Docker** (PostgreSQL, Redis et Kafka sont tous les trois lancés en conteneur par l'AppHost).
 
 ## Les couches et la règle de dépendance
 
@@ -27,7 +27,7 @@ dotnet test                                                      # 100+ tests, a
 |---|---|---|
 | `Domain` | Entités riches (`Order`, `OrderLine`), règles métier, machine à états, pattern **Result** (`Result`, `Error`) | rien |
 | `Application` | Cas d'usage (`OrderService`), DTOs, **ports** (`IOrderRepository`, `IUnitOfWork`, `ICacheService`) | Domain |
-| `Infrastructure` | Adaptateurs : EF Core + SQLite, transaction + verrou pessimiste, HybridCache, pipeline Polly, health checks | Application, Domain |
+| `Infrastructure` | Adaptateurs : EF Core + PostgreSQL, transaction + verrou pessimiste, HybridCache, pipeline Polly, health checks | Application, Domain |
 | `Api` | Minimal API, rate limiting, gestion d'exceptions, mapping `Result` → HTTP, composition root | tout (pour câbler) |
 | `AppHost` / `ServiceDefaults` | Orchestration Aspire, OpenTelemetry, health checks par défaut | — |
 
@@ -120,7 +120,7 @@ flowchart TD
   subgraph Infrastructure["Infrastructure"]
     efuow["EfUnitOfWork<br/>pipeline Polly (retry + circuit breaker)<br/>BEGIN IMMEDIATE"]
     orepo["OrderRepository<br/>GetByIdForUpdateAsync"]
-    db[("AppDbContext<br/>EF Core + SQLite")]
+    db[("AppDbContext<br/>EF Core + PostgreSQL")]
     hcache["HybridCacheService<br/>L1 mémoire + L2 Redis optionnel"]
   end
 
@@ -168,12 +168,12 @@ Exemple suivi : `POST /api/orders/{id}/confirm`.
 **3. Infrastructure : transaction et résilience**
 
 6. **`EfUnitOfWork`** (implémentation du port) passe d'abord par le **pipeline Polly** (`DatabaseResiliencePipeline`) : retry avec backoff exponentiel + jitter, uniquement sur erreurs *transitoires* (`TransientErrorDetector`), et circuit breaker.
-7. Il vide le `ChangeTracker`, ouvre la connexion SQLite et démarre la transaction avec `BEGIN IMMEDIATE` : le verrou d'écriture est pris **avant** toute lecture (concurrence pessimiste). Les autres écrivains attendent leur tour ; les lecteurs ne sont pas bloqués grâce au mode WAL.
+7. Il vide le `ChangeTracker` et démarre une transaction PostgreSQL standard (`BeginTransactionAsync`). Le verrou pessimiste n'est **pas** pris ici : il est posé ligne par ligne, un peu plus loin, par `GetByIdForUpdateAsync` (`SELECT ... FOR UPDATE`).
 8. Il exécute ensuite la lambda fournie par le service (retour dans `Application`).
 
 **4. Application → Infrastructure → Domain : le travail dans la transaction**
 
-9. Le service appelle `repository.GetByIdForUpdateAsync(id)` (port `IOrderRepository`, implémenté par `OrderRepository` via `AppDbContext`). La commande est lue **sous verrou** : personne ne peut la modifier entre la lecture et le commit. Absente ⇒ `OrderErrors.NotFound(id)`.
+9. Le service appelle `repository.GetByIdForUpdateAsync(id)` (port `IOrderRepository`, implémenté par `OrderRepository` via `AppDbContext`). La commande est lue avec un verrou de ligne PostgreSQL (`SELECT ... FOR UPDATE`) : personne ne peut la modifier entre la lecture et le commit, mais les autres commandes restent libres. Absente ⇒ `OrderErrors.NotFound(id)`.
 10. Le service appelle la méthode du domaine (`order.Confirm(now)`). C'est ici, et uniquement ici, que vivent les règles : transitions d'état autorisées (`Pending → Confirmed`), invariants, mise à jour de `UpdatedAt`. Le résultat est un `Result` : succès, ou `Error` (`InvalidTransition`, `NotModifiable`...). Aucune exception n'est levée pour une erreur métier.
 11. Le service convertit l'entité en DTO (`OrderMappings.ToDto`) en cas de succès, ou propage l'`Error`.
 
@@ -215,9 +215,9 @@ Exemple suivi : `POST /api/orders/{id}/confirm`.
 |---|---|---|
 | **Pattern Result** | `Domain/Common/Result.cs`, `Error.cs`, `Api/Extensions/ResultExtensions.cs` | Les erreurs métier sont des valeurs, pas des exceptions. `ErrorType` → code HTTP uniquement dans l'API. |
 | **Minimal API** | `Api/Endpoints/OrderEndpoints.cs` | Endpoints fins : HTTP → service → `Result` → HTTP. |
-| **SQLite + EF Core** | `Infrastructure/Persistence/*` (+ `Migrations/`) | Mapping en `IEntityTypeConfiguration`, `Order` reste pur. |
+| **PostgreSQL + EF Core** | `Infrastructure/Persistence/*` (+ `Migrations/`) | Mapping en `IEntityTypeConfiguration`, `Order` reste pur. Conteneur Docker `postgres:17` lancé par l'AppHost. |
 | **Transaction** | `Infrastructure/Persistence/EfUnitOfWork.cs` | Tout le travail est atomique : commit si `Result` OK, rollback sinon/exception. |
-| **Concurrency pessimiste** | `EfUnitOfWork` + `OrderRepository.GetByIdForUpdateAsync` | `BEGIN IMMEDIATE` (équivalent SQLite d'un `SELECT … FOR UPDATE`) : on verrouille *avant* de lire. Prouvé par un test à 12 écrivains concurrents. |
+| **Concurrency pessimiste** | `EfUnitOfWork` + `OrderRepository.GetByIdForUpdateAsync` | `SELECT ... FOR UPDATE` : verrou de **ligne** PostgreSQL posé *avant* de lire, relâché au commit/rollback. Prouvé par un test à 12 écrivains concurrents. |
 | **Cache** | `Infrastructure/Caching/HybridCacheService.cs`, `OrderService.GetByIdAsync` | Cache-aside, L1 mémoire + L2 Redis optionnel, anti-stampede, invalidation après commit. |
 | **Retry (Polly)** | `Infrastructure/Resilience/DatabaseResiliencePipeline.cs` | Backoff exponentiel + jitter, uniquement sur erreurs *transitoires*, rejoue la transaction entière. |
 | **Circuit breaker** | idem + `GlobalExceptionHandler` | Ouvert ⇒ fail fast ⇒ `503` + `Retry-After`. État exposé en health check. |
@@ -231,7 +231,7 @@ Exemple suivi : `POST /api/orders/{id}/confirm`.
 |---|---|---|
 | `Domain.Tests` | Unitaire pur | invariants, machine à états, `Result` |
 | `Application.Tests` | Unitaire avec fakes en mémoire | orchestration : transaction, verrou, cache-aside + invalidation, mapping d'erreurs |
-| `Infrastructure.Tests` | Intégration (vraie SQLite) | repository, commit/rollback, **verrou pessimiste**, retry, circuit breaker, cache, health checks |
+| `Infrastructure.Tests` | Intégration (vrai conteneur PostgreSQL via Testcontainers) | repository, commit/rollback, **verrou pessimiste**, retry, circuit breaker, cache, health checks |
 | `Api.Tests` | Bout en bout (`WebApplicationFactory`) | CRUD HTTP, codes de statut, cache non périmé, concurrence, rate limiting, 503/500 |
 | `Architecture.Tests` | Architecture | règle de dépendance, encapsulation, ports |
 
@@ -239,15 +239,15 @@ Exemple suivi : `POST /api/orders/{id}/confirm`.
 
 **Déjà en place**
 * API **sans état** (le cache L2 et la base sont externes) ⇒ scalable horizontalement ; 2 réplicas dans l'AppHost.
+* PostgreSQL, Redis et Kafka en conteneurs Docker partagés entre réplicas (contrairement à un fichier SQLite local).
 * Probes liveness/readiness, arrêt gracieux (hôte ASP.NET), timeouts, retry, circuit breaker, rate limiting, ProblemDetails (RFC 9457).
 * Central Package Management, warnings = erreurs, CI GitHub Actions (`.github/workflows/ci.yml`), Dockerfile (non testé ici).
 
-**À faire pour une vraie production multi-nœuds** (volontairement hors périmètre d'un template SQLite)
-1. **Remplacer SQLite** par PostgreSQL/SQL Server : un fichier ne se partage pas entre machines. Seule la couche `Infrastructure` change ; sur ces bases, `GetByIdForUpdateAsync` devient un vrai verrou de ligne (`FOR UPDATE` / `UPDLOCK`).
-2. **Rate limiting global** : les compteurs sont par instance ⇒ à déléguer à la passerelle/ingress ou à Redis.
-3. **Migrations** via un *migration bundle* dans le pipeline de déploiement plutôt qu'au démarrage.
-4. **Authentification/autorisation**, **idempotence** des POST (`Idempotency-Key`), **versioning** d'API.
-5. Réplication/sauvegardes de la base, HTTPS terminé au niveau de l'ingress.
+**À faire pour une vraie production multi-nœuds**
+1. **Rate limiting global** : les compteurs sont par instance ⇒ à déléguer à la passerelle/ingress ou à Redis.
+2. **Migrations** via un *migration bundle* dans le pipeline de déploiement plutôt qu'au démarrage.
+3. **Authentification/autorisation**, **idempotence** des POST (`Idempotency-Key`), **versioning** d'API.
+4. Réplication/sauvegardes de PostgreSQL, HTTPS terminé au niveau de l'ingress.
 
 ## Structure
 
@@ -255,7 +255,7 @@ Exemple suivi : `POST /api/orders/{id}/confirm`.
 src/
   CleanArchitectureSkeleton.Domain/          # cœur métier, zéro dépendance
   CleanArchitectureSkeleton.Application/     # cas d'usage + ports
-  CleanArchitectureSkeleton.Infrastructure/  # EF Core, SQLite, cache, Polly, health checks
+  CleanArchitectureSkeleton.Infrastructure/  # EF Core, PostgreSQL, cache, Polly, health checks
   CleanArchitectureSkeleton.Api/             # Minimal API, composition root
   CleanArchitectureSkeleton.ServiceDefaults/ # Aspire : télémétrie, health checks
   CleanArchitectureSkeleton.AppHost/         # Aspire : orchestration

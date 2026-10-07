@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace CleanArchitectureSkeleton.Api.Tests;
 
-/// <summary>Tests de bout en bout : HTTP → endpoint → service → repository → SQLite, et retour.</summary>
+/// <summary>Tests de bout en bout : HTTP → endpoint → service → repository → PostgreSQL, et retour.</summary>
 public sealed class OrdersApiTests : IDisposable
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)

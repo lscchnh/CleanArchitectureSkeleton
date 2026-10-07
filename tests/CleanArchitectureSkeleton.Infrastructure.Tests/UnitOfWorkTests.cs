@@ -8,9 +8,9 @@ namespace CleanArchitectureSkeleton.Infrastructure.Tests;
 /// <summary>Transactions et concurrency control pessimiste, sur une vraie base.</summary>
 public class UnitOfWorkTests : IAsyncLifetime
 {
-    private SqliteTestHost _host = null!;
+    private PostgresTestHost _host = null!;
 
-    public async Task InitializeAsync() => _host = await SqliteTestHost.CreateAsync();
+    public async Task InitializeAsync() => _host = await PostgresTestHost.CreateAsync();
 
     public async Task DisposeAsync() => await _host.DisposeAsync();
 

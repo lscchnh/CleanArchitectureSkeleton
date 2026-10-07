@@ -37,13 +37,13 @@ public class DependencyRuleTests
     public void Domain_depends_on_nothing_but_the_BCL() =>
         AssertNoDependencies(Domain,
             ApplicationNs, InfrastructureNs, ApiNs,
-            "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "Microsoft.Extensions", "Microsoft.Data", "Polly");
+            "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "Microsoft.Extensions", "Npgsql", "Polly");
 
     [Fact]
     public void Application_does_not_depend_on_outer_layers_or_technologies() =>
         AssertNoDependencies(Application,
             InfrastructureNs, ApiNs,
-            "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "Microsoft.Data", "Polly");
+            "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "Npgsql", "Polly");
 
     [Fact]
     public void Infrastructure_does_not_depend_on_the_presentation_layer() =>
@@ -54,7 +54,7 @@ public class DependencyRuleTests
     {
         // L'API ne doit pas connaître EF Core : elle passe par les services applicatifs.
         // (Elle référence Infrastructure uniquement pour le câblage DI dans Program.cs.)
-        AssertNoDependencies(Api, "Microsoft.EntityFrameworkCore", "Microsoft.Data.Sqlite");
+        AssertNoDependencies(Api, "Microsoft.EntityFrameworkCore", "Npgsql");
     }
 
     [Fact]

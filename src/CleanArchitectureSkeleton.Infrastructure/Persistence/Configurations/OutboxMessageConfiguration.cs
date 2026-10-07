@@ -15,12 +15,9 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(m => m.Type).IsRequired().HasMaxLength(200);
         builder.Property(m => m.Content).IsRequired();
 
-        // Mêmes raisons que dans OrderConfiguration : SQLite ne trie/compare pas nativement les DateTimeOffset.
-        builder.Property(m => m.OccurredOnUtc)
-            .HasConversion(v => v.UtcTicks, v => new DateTimeOffset(v, TimeSpan.Zero));
-        builder.Property(m => m.ProcessedOnUtc)
-            .HasConversion(v => v.HasValue ? v.Value.UtcTicks : (long?)null,
-                           v => v.HasValue ? new DateTimeOffset(v.Value, TimeSpan.Zero) : null);
+        // PostgreSQL gère nativement DateTimeOffset (colonne timestamptz) : aucune conversion nécessaire.
+        builder.Property(m => m.OccurredOnUtc);
+        builder.Property(m => m.ProcessedOnUtc);
 
         // Index pour que l'OutboxProcessor ne scanne pas toute la table à chaque tick.
         builder.HasIndex(m => m.ProcessedOnUtc);

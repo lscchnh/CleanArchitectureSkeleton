@@ -1,17 +1,20 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
+using Testcontainers.PostgreSql;
 
 namespace CleanArchitectureSkeleton.Api.Tests;
 
 /// <summary>
-/// Démarre l'API COMPLÈTE en mémoire (vrai pipeline HTTP, vraie injection de dépendances, vraie base SQLite temporaire).
-/// Chaque factory a sa propre base : les tests sont isolés et peuvent tourner en parallèle.
+/// Démarre l'API COMPLÈTE en mémoire (vrai pipeline HTTP, vraie injection de dépendances, vrai conteneur
+/// PostgreSQL via Testcontainers — nécessite Docker). Chaque factory démarre son propre conteneur :
+/// les tests sont isolés et peuvent tourner en parallèle.
 /// </summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
-    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"orders-api-test-{Guid.NewGuid():N}.db");
+    // WebApplicationFactory n'offre pas de hook async pour la construction : on démarre le conteneur
+    // de façon synchrone (bloquante) dans le constructeur, ce qui reste acceptable pour des tests.
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder().WithImage("postgres:17").Build();
     private readonly Dictionary<string, string?> _settings;
     private readonly Action<IServiceCollection>? _configureServices;
 
@@ -19,12 +22,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     {
         _settings = settings ?? [];
         _configureServices = configureServices;
+        _container.StartAsync().GetAwaiter().GetResult();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-        builder.UseSetting("ConnectionStrings:orders-db", $"Data Source={_databasePath};Default Timeout=30");
+        builder.UseSetting("ConnectionStrings:orders-db", _container.GetConnectionString());
         foreach (var (key, value) in _settings)
         {
             builder.UseSetting(key, value);
@@ -44,13 +48,6 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             return;
         }
 
-        SqliteConnection.ClearAllPools();
-        foreach (var file in new[] { _databasePath, _databasePath + "-wal", _databasePath + "-shm" })
-        {
-            if (File.Exists(file))
-            {
-                File.Delete(file);
-            }
-        }
+        _container.DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }

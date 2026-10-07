@@ -12,7 +12,7 @@ internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<A
     public AppDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlite("Data Source=design-time.db")
+            .UseNpgsql("Host=localhost;Database=orders-db;Username=postgres;Password=postgres")
             .Options;
         return new AppDbContext(options);
     }

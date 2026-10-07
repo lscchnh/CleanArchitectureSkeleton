@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+using Npgsql;
 
 namespace CleanArchitectureSkeleton.Infrastructure.Resilience;
 
@@ -8,18 +8,28 @@ namespace CleanArchitectureSkeleton.Infrastructure.Resilience;
 /// </summary>
 public static class TransientErrorDetector
 {
-    // Codes primaires SQLite : https://www.sqlite.org/rescode.html
-    private const int SqliteBusy = 5;      // un autre writer détient le verrou
-    private const int SqliteLocked = 6;    // conflit de verrou dans la même connexion partagée
-    private const int SqliteIoError = 10;  // erreur disque/IO
-    private const int SqliteCantOpen = 14; // fichier momentanément inaccessible
+    // Codes d'erreur SQLSTATE PostgreSQL : https://www.postgresql.org/docs/current/errcodes-appendix.html
+    private const string SerializationFailure = "40001"; // conflit de sérialisation (isolation SERIALIZABLE/REPEATABLE READ)
+    private const string DeadlockDetected = "40P01";     // deadlock détecté entre deux transactions
+    private const string TooManyConnections = "53300";   // pool/serveur saturé, momentanément indisponible
+    private const string ConnectionException = "08006";  // connexion perdue
+    private const string ConnectionDoesNotExist = "08003";
+    private const string ConnectionFailure = "08001";
+    private const string SqlClientUnableToEstablishConnection = "08004";
 
     public static bool IsTransient(Exception? exception)
     {
-        // EF Core encapsule souvent l'erreur d'origine (DbUpdateException → SqliteException) : on remonte la chaîne.
+        // EF Core encapsule souvent l'erreur d'origine (DbUpdateException → PostgresException) : on remonte la chaîne.
         for (var current = exception; current is not null; current = current.InnerException)
         {
-            if (current is SqliteException { SqliteErrorCode: SqliteBusy or SqliteLocked or SqliteIoError or SqliteCantOpen })
+            if (current is PostgresException { SqlState: SerializationFailure or DeadlockDetected or TooManyConnections
+                or ConnectionException or ConnectionDoesNotExist or ConnectionFailure or SqlClientUnableToEstablishConnection })
+            {
+                return true;
+            }
+
+            // Erreurs réseau/socket brutes (ex: conteneur Docker pas encore prêt) remontées par Npgsql.
+            if (current is NpgsqlException { InnerException: System.Net.Sockets.SocketException })
             {
                 return true;
             }

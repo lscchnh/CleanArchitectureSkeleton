@@ -4,7 +4,6 @@ using CleanArchitectureSkeleton.Domain.Common;
 using CleanArchitectureSkeleton.Domain.Orders;
 using CleanArchitectureSkeleton.Infrastructure.Persistence.Outbox;
 using CleanArchitectureSkeleton.Infrastructure.Resilience;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Polly.Registry;
 
@@ -16,20 +15,16 @@ namespace CleanArchitectureSkeleton.Infrastructure.Persistence;
 /// ── Concurrency control pessimiste ──
 /// Principe : "je verrouille AVANT de lire, donc personne ne peut me doubler" (opposé à l'optimiste, qui détecte
 /// le conflit APRÈS coup avec un RowVersion et fait échouer le perdant).
-/// SQLite n'a pas de verrou de ligne (pas de SELECT ... FOR UPDATE) : son équivalent est
-/// <c>BEGIN IMMEDIATE</c>, qui prend le verrou d'ÉCRITURE de la base dès l'ouverture de la transaction.
-/// Les autres écrivains attendent (busy timeout) puis passent à leur tour : les modifications sont sérialisées,
-/// ce qui élimine les "lost updates" (deux utilisateurs qui écrasent mutuellement leurs changements).
-/// Pourquoi pas le BEGIN par défaut (DEFERRED) ? Il démarre en lecture et tente de passer en écriture plus tard :
-/// si un autre écrivain est passé entre-temps, SQLite échoue immédiatement avec SQLITE_BUSY (deadlock de mise à niveau).
-/// Verrouiller dès le début évite ce piège.
-/// Avec WAL (activé au démarrage), les lecteurs ne sont jamais bloqués par ce verrou.
+/// PostgreSQL verrouille au niveau LIGNE (contrairement à SQLite qui verrouille tout le fichier) :
+/// <see cref="OrderRepository"/> exécute un <c>SELECT ... FOR UPDATE</c> dans cette même transaction,
+/// ce qui bloque les autres transactions tentant de lire/modifier CETTE ligne, sans impacter les autres commandes.
 ///
 /// ── Transaction ──
 /// Tout ce que fait <c>work</c> est atomique : commit si le Result est un succès, rollback sinon (ou en cas d'exception).
 ///
 /// ── Résilience ──
-/// Si l'écriture échoue de façon transitoire (base occupée...), la transaction ENTIÈRE est rejouée par le pipeline Polly.
+/// Si l'écriture échoue de façon transitoire (connexion PostgreSQL momentanément indisponible, deadlock...),
+/// la transaction ENTIÈRE est rejouée par le pipeline Polly.
 /// </summary>
 internal sealed class EfUnitOfWork(AppDbContext db, ResiliencePipelineProvider<string> pipelines) : IUnitOfWork
 {
@@ -55,44 +50,32 @@ internal sealed class EfUnitOfWork(AppDbContext db, ResiliencePipelineProvider<s
         // Une tentative précédente (échouée) a pu laisser des entités à moitié modifiées dans le DbContext : on repart de zéro.
         db.ChangeTracker.Clear();
 
-        var connection = (SqliteConnection)db.Database.GetDbConnection();
-        await connection.OpenAsync(ct);
+        // Transaction standard EF/PostgreSQL. Le verrou pessimiste n'est PAS pris ici : il est pris ligne par ligne
+        // par OrderRepository.GetByIdForUpdateAsync (SELECT ... FOR UPDATE) au moment où l'agrégat est lu.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         try
         {
-            // deferred: false  ⇒  BEGIN IMMEDIATE  ⇒  verrou d'écriture pris tout de suite (pessimiste).
-            await using var transaction = connection.BeginTransaction(deferred: false);
+            var result = await work(ct);
 
-            // On dit à EF Core de participer à CETTE transaction (celle qui détient le verrou).
-            await db.Database.UseTransactionAsync(transaction, ct);
-            try
+            if (result.IsFailure)
             {
-                var result = await work(ct);
-
-                if (result.IsFailure)
-                {
-                    // Échec métier : on n'écrit rien (rollback à la sortie du using, la transaction n'est pas commitée).
-                    return result;
-                }
-
-                // Pattern Transactional Outbox : les événements levés par les agrégats modifiés sont copiés
-                // dans la table OutboxMessages AVANT SaveChangesAsync, donc dans LA MÊME transaction SQLite
-                // que l'écriture métier. Un BackgroundService séparé (OutboxProcessor) les publiera ensuite
-                // sur RabbitMQ de façon asynchrone, hors du chemin critique de la requête.
-                EnqueueDomainEventsToOutbox();
-
-                await db.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
+                // Échec métier : on n'écrit rien (rollback à la sortie du using, la transaction n'est pas commitée).
                 return result;
             }
-            finally
-            {
-                // On détache la transaction du DbContext pour qu'il reste réutilisable (retry, appels suivants).
-                await db.Database.UseTransactionAsync(null, CancellationToken.None);
-            }
+
+            // Pattern Transactional Outbox : les événements levés par les agrégats modifiés sont copiés
+            // dans la table OutboxMessages AVANT SaveChangesAsync, donc dans LA MÊME transaction PostgreSQL
+            // que l'écriture métier. Un BackgroundService séparé (OutboxProcessor) les publiera ensuite
+            // sur Kafka de façon asynchrone, hors du chemin critique de la requête.
+            EnqueueDomainEventsToOutbox();
+
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return result;
         }
         finally
         {
-            await connection.CloseAsync();
+            // Rollback automatique si la transaction n'a pas été commitée (await using Dispose).
         }
     }
 
@@ -100,7 +83,7 @@ internal sealed class EfUnitOfWork(AppDbContext db, ResiliencePipelineProvider<s
     /// Parcourt les agrégats <see cref="Order"/> suivis par le ChangeTracker (ajoutés ou modifiés) et transforme
     /// chacun de leurs <c>DomainEvents</c> en une ligne <see cref="OutboxMessage"/>. Le nom du type concret
     /// (ex: "OrderCreatedDomainEvent") est conservé comme discriminant : l'OutboxProcessor n'a donc pas besoin
-    /// de connaître le Domain pour router le message, seulement de propager ce nom en routing key RabbitMQ.
+    /// de connaître le Domain pour router le message, seulement de propager ce nom en clé Kafka.
     /// </summary>
     private void EnqueueDomainEventsToOutbox()
     {

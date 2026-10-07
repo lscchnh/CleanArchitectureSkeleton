@@ -21,9 +21,13 @@ internal sealed class OrderRepository(AppDbContext db, ResiliencePipelineProvide
     public async Task<Order?> GetByIdForUpdateAsync(Guid id, CancellationToken cancellationToken = default) =>
         // PAS de pipeline ici : on est dans une transaction, et c'est la transaction ENTIÈRE qui est rejouée
         // par EfUnitOfWork. Réessayer une seule requête au milieu d'une transaction fausserait la logique.
-        // Le verrou a déjà été posé au démarrage de la transaction (BEGIN IMMEDIATE) : cette lecture est donc protégée.
-        // Sur PostgreSQL/SQL Server, on écrirait ici un verrou de ligne : SELECT ... FOR UPDATE / UPDLOCK.
-        await db.Orders.FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+        // FOR UPDATE pose un verrou EXCLUSIF sur CETTE ligne, pour la durée de la transaction en cours :
+        // toute autre transaction qui tente de la lire avec FOR UPDATE (ou de la modifier) est mise en attente
+        // jusqu'au commit/rollback de celle-ci. Les lectures simples (sans FOR UPDATE, ex: GetByIdAsync) ne
+        // sont PAS bloquées : seul le "pessimistic write lock" est concerné.
+        await db.Orders
+            .FromSqlInterpolated($"""SELECT * FROM "Orders" WHERE "Id" = {id} FOR UPDATE""")
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<(IReadOnlyList<Order> Items, int TotalCount)> ListAsync(
         int page, int pageSize, OrderStatus? status, CancellationToken cancellationToken = default)

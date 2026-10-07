@@ -4,13 +4,13 @@ namespace CleanArchitectureSkeleton.Infrastructure.Persistence.Outbox;
 /// Trace, côté "consommateur", de chaque event déjà traité : c'est la table qui rend le
 /// <c>OutboxConsumer</c> IDEMPOTENT.
 ///
-/// Pourquoi l'idempotence est nécessaire : RabbitMQ garantit "au moins une fois" (at-least-once),
-/// pas "exactement une fois". Un message peut donc être redélivré (ex: le consommateur plante juste
-/// après avoir traité le message mais avant d'envoyer l'ack réseau). Sans protection, on traiterait
+/// Pourquoi l'idempotence est nécessaire : Kafka garantit "au moins une fois" (at-least-once),
+/// pas "exactement une fois". Un message peut donc être relu (ex: le consommateur plante juste
+/// après avoir traité le message mais avant de committer l'offset). Sans protection, on traiterait
 /// deux fois le même event.
 ///
 /// <see cref="Id"/> est volontairement le MÊME Guid que l'<c>OutboxMessage.Id</c> d'origine (propagé en
-/// tant que MessageId RabbitMQ) : une simple contrainte d'unicité sur la clé primaire suffit donc à
+/// tant que MessageId Kafka) : une simple contrainte d'unicité sur la clé primaire suffit donc à
 /// détecter un doublon, sans logique métier supplémentaire.
 /// </summary>
 public sealed class ProcessedMessage
