@@ -14,7 +14,8 @@ var postgres = builder.AddPostgres("postgres")
     .WithImage("postgres")
     .WithImageTag("17")
     // Volume nommé : les données survivent aux redémarrages de l'AppHost (comme Redis/Kafka).
-    .WithDataVolume("cleanarchitectureskeleton-postgres-data");
+    .WithDataVolume("cleanarchitectureskeleton-postgres-data")
+    .WithPgAdmin();
 
 // AddDatabase crée la base logique "orders-db" DANS le serveur PostgreSQL et expose une chaîne de connexion
 // nommée "orders-db" : exactement le nom attendu par DependencyInjection.DatabaseConnectionName, donc rien
@@ -46,8 +47,6 @@ api.WithReference(redis).WaitFor(redis);
 // Mode KRaft (sans Zookeeper) : un seul conteneur suffit. WithKafkaUI() expose une interface web
 // (port dynamique géré par Aspire) pour observer les topics/messages publiés.
 var kafka = builder.AddKafka("kafka")
-    .WithImage("apache/kafka")
-    .WithImageTag("3.9.1")
     // Volume nommé : les topics/messages déclarés survivent aux redémarrages de l'AppHost.
     .WithDataVolume("cleanarchitectureskeleton-kafka-data")
     .WithKafkaUI();
