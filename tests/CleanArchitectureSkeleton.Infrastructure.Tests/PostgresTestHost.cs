@@ -25,9 +25,7 @@ public sealed class PostgresTestHost : IAsyncDisposable
 
     public static async Task<PostgresTestHost> CreateAsync(Dictionary<string, string?>? extraSettings = null)
     {
-        var container = new PostgreSqlBuilder()
-            .WithImage("postgres:17")
-            .Build();
+        var container = new PostgreSqlBuilder("postgres:17").Build();
         await container.StartAsync();
 
         var settings = new Dictionary<string, string?>

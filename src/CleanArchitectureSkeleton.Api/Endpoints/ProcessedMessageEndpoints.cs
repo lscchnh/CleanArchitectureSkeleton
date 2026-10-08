@@ -1,4 +1,3 @@
-using CleanArchitectureSkeleton.Application.Abstractions;
 using CleanArchitectureSkeleton.Application.ProcessedMessages;
 
 namespace CleanArchitectureSkeleton.Api.Endpoints;
@@ -13,10 +12,10 @@ public static class ProcessedMessageEndpoints
     public static IEndpointRouteBuilder MapProcessedMessageEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/processed-messages", async (
-                IProcessedMessageQueries queries,
+                IProcessedMessageService service,
                 CancellationToken ct,
                 int count = 20) =>
-                Results.Ok(await queries.GetLatestAsync(count, ct)))
+                Results.Ok(await service.GetLatestAsync(count, ct)))
             .WithName("ListProcessedMessages")
             .WithTags("ProcessedMessages")
             .Produces<IReadOnlyList<ProcessedMessageDto>>();

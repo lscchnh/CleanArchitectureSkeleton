@@ -14,7 +14,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     // WebApplicationFactory n'offre pas de hook async pour la construction : on démarre le conteneur
     // de façon synchrone (bloquante) dans le constructeur, ce qui reste acceptable pour des tests.
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder().WithImage("postgres:17").Build();
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:17").Build();
     private readonly Dictionary<string, string?> _settings;
     private readonly Action<IServiceCollection>? _configureServices;
 

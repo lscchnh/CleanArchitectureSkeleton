@@ -1,4 +1,5 @@
 using CleanArchitectureSkeleton.Application.Orders;
+using CleanArchitectureSkeleton.Application.ProcessedMessages;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CleanArchitectureSkeleton.Application;
@@ -9,6 +10,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<IProcessedMessageService, ProcessedMessageService>();
         services.AddSingleton(TimeProvider.System);
         return services;
     }

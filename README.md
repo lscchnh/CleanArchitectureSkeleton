@@ -3,7 +3,7 @@
 Template **.NET 10 + .NET Aspire** en **Clean Architecture**, à but **éducatif** : chaque choix est expliqué dans les commentaires du code.
 Cas d'usage fil rouge : un **CRUD de commandes (Orders)**, volontairement « overkill » pour montrer toutes les briques d'un service industrialisable.
 
-> Architecture en **services classiques** (pas de CQRS / MediatR) : une interface `IOrderService`, une classe `OrderService`.
+> Architecture en **services classiques** (pas de CQRS / MediatR) : une interface `IOrderService`, une classe `OrderService` — organisée en **vertical slices** (un dossier par cas d'usage) plutôt qu'un unique fichier fourre-tout.
 
 ## Démarrage rapide
 
@@ -32,6 +32,33 @@ dotnet test                                                      # 100+ tests ; 
 | `AppHost` / `ServiceDefaults` | Orchestration Aspire, OpenTelemetry, health checks par défaut | — |
 
 Cette règle est **vérifiée automatiquement** par `CleanArchitectureSkeleton.Architecture.Tests` (NetArchTest).
+
+### Organisation interne : vertical slices (hybride, sans MediatR)
+
+À l'intérieur d'`Application` et d'`Api`, le code n'est pas rangé par **type technique** (tous les DTOs ensemble, tous les endpoints ensemble...) mais par **cas d'usage** : tout ce qui concerne `ConfirmOrder` vit dans un dossier `ConfirmOrder/`, que ce soit côté service ou côté endpoint.
+
+```
+Application/Orders/
+  IOrderService.cs            # façade UNIQUE, pas de handler par cas d'usage
+  OrderService.cs             # squelette partagé : champs, ModifyAsync (verrou+commit+invalidation), BuildLines
+  Contracts/                  # DTOs partagés par plusieurs slices (OrderDto, PagedResult<T>, OrderLineRequest)
+  CreateOrder/                # CreateOrderRequest.cs + OrderService.CreateOrder.cs (partial)
+  GetOrder/                   # OrderService.GetOrder.cs
+  ListOrders/                 # OrderService.ListOrders.cs
+  UpdateOrder/                # UpdateOrderRequest.cs + OrderService.UpdateOrder.cs
+  ConfirmOrder/ ShipOrder/ CancelOrder/ DeleteOrder/   # un fichier par transition d'état
+
+Api/Endpoints/Orders/
+  CreateOrder/CreateOrderEndpoint.cs      # un Map<CasDUsage>Endpoint(RouteGroupBuilder) par slice
+  GetOrder/GetOrderEndpoint.cs
+  ...
+```
+
+Le compromis assumé, volontairement **hybride** :
+* **Pas de MediatR, pas de handler par classe** : `OrderService` reste une seule classe (`partial`) qui implémente `IOrderService` — zéro changement pour les appelants (`Api/Program.cs`, les tests) ni pour l'injection de dépendances (`AddApplication`).
+* Seuls les éléments **réellement partagés entre plusieurs slices** (verrou pessimiste + invalidation du cache dans `ModifyAsync`, mapping DTO← écriture dans `BuildLines`) vivent dans le fichier racine `OrderService.cs` ; le reste est isolé dans le dossier de sa slice.
+* Les tests (`Application.Tests/Orders/`) suivent le même découpage : un fichier de tests par slice, plus une classe de base `OrderServiceTestBase` pour le setup commun (fakes, helpers de seed).
+* Avantage : ajouter/modifier un cas d'usage (ex. `ArchiveOrder`) touche un seul dossier, sans rouvrir un fichier de 150+ lignes partagé par tous les autres cas d'usage.
 
 ### Modèle de domaine Orders
 
@@ -254,12 +281,13 @@ Exemple suivi : `POST /api/orders/{id}/confirm`.
 ```
 src/
   CleanArchitectureSkeleton.Domain/          # cœur métier, zéro dépendance
-  CleanArchitectureSkeleton.Application/     # cas d'usage + ports
+  CleanArchitectureSkeleton.Application/     # cas d'usage + ports, en vertical slices (Orders/<CasDUsage>/)
   CleanArchitectureSkeleton.Infrastructure/  # EF Core, PostgreSQL, cache, Polly, health checks
-  CleanArchitectureSkeleton.Api/             # Minimal API, composition root
+  CleanArchitectureSkeleton.Api/             # Minimal API (Endpoints/Orders/<CasDUsage>/), composition root
   CleanArchitectureSkeleton.ServiceDefaults/ # Aspire : télémétrie, health checks
   CleanArchitectureSkeleton.AppHost/         # Aspire : orchestration
-tests/                                       # un projet de tests par niveau
+  CleanArchitectureSkeleton.Web/             # Blazor Server : UI de gestion des commandes
+tests/                                       # un projet de tests par niveau, même découpage en slices côté Application.Tests
 ```
 
 ## Utiliser ce template
