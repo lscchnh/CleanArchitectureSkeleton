@@ -1,3 +1,5 @@
+using CleanArchitectureSkeleton.Contracts.ProcessedMessages;
+
 namespace CleanArchitectureSkeleton.Application.Abstractions;
 
 /// <summary>
@@ -8,5 +10,5 @@ namespace CleanArchitectureSkeleton.Application.Abstractions;
 public interface IProcessedMessageQueries
 {
     /// <summary>Les <paramref name="count"/> événements les plus récemment traités, du plus récent au plus ancien.</summary>
-    Task<IReadOnlyList<ProcessedMessages.ProcessedMessageDto>> GetLatestAsync(int count, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProcessedMessageDto>> GetLatestAsync(int count, CancellationToken cancellationToken = default);
 }

@@ -21,15 +21,20 @@ dotnet test                                                      # 100+ tests ; 
 
 ```
  Api ──► Infrastructure ──► Application ──► Domain          (les flèches pointent vers l'intérieur)
+          Web ──► Contracts ──► Domain                      (le Web est un CLIENT, pas un pair d'Application)
 ```
 
 | Projet | Rôle | Dépend de |
 |---|---|---|
 | `Domain` | Entités riches (`Order`, `OrderLine`), règles métier, machine à états, pattern **Result** (`Result`, `Error`) | rien |
-| `Application` | Cas d'usage (`OrderService`), DTOs, **ports** (`IOrderRepository`, `IUnitOfWork`, `ICacheService`) | Domain |
-| `Infrastructure` | Adaptateurs : EF Core + PostgreSQL, transaction + verrou pessimiste, HybridCache, pipeline Polly, health checks | Application, Domain |
+| `Contracts` | Contrat HTTP public : DTOs de lecture/écriture (`OrderDto`, `CreateOrderRequest`, `PagedResult<T>`...) | Domain (seulement `OrderStatus`, un enum) |
+| `Application` | Cas d'usage (`OrderService`), **ports** (`IOrderRepository`, `IUnitOfWork`, `ICacheService`) | Domain, Contracts |
+| `Infrastructure` | Adaptateurs : EF Core + PostgreSQL, transaction + verrou pessimiste, HybridCache, pipeline Polly, health checks | Application, Contracts, Domain |
 | `Api` | Minimal API, rate limiting, gestion d'exceptions, mapping `Result` → HTTP, composition root | tout (pour câbler) |
+| `Web` | Blazor Server : UI de gestion des commandes, **client HTTP** de l'Api | Contracts, Domain |
 | `AppHost` / `ServiceDefaults` | Orchestration Aspire, OpenTelemetry, health checks par défaut | — |
+
+`Web` ne référence jamais `Application` : un client HTTP n'a besoin que du contrat qui circule sur le fil (`Contracts`), jamais des ports/de l'orchestration internes au serveur (`IOrderService`, `IUnitOfWork`...). Vérifié par `Web_does_not_depend_on_the_application_layer` dans `Architecture.Tests`.
 
 Cette règle est **vérifiée automatiquement** par `CleanArchitectureSkeleton.Architecture.Tests` (NetArchTest).
 
@@ -281,12 +286,13 @@ Exemple suivi : `POST /api/orders/{id}/confirm`.
 ```
 src/
   CleanArchitectureSkeleton.Domain/          # cœur métier, zéro dépendance
+  CleanArchitectureSkeleton.Contracts/       # DTOs du contrat HTTP (Orders/, ProcessedMessages/), partagés Api ↔ Web
   CleanArchitectureSkeleton.Application/     # cas d'usage + ports, en vertical slices (Orders/<CasDUsage>/)
   CleanArchitectureSkeleton.Infrastructure/  # EF Core, PostgreSQL, cache, Polly, health checks
   CleanArchitectureSkeleton.Api/             # Minimal API (Endpoints/Orders/<CasDUsage>/), composition root
   CleanArchitectureSkeleton.ServiceDefaults/ # Aspire : télémétrie, health checks
   CleanArchitectureSkeleton.AppHost/         # Aspire : orchestration
-  CleanArchitectureSkeleton.Web/             # Blazor Server : UI de gestion des commandes
+  CleanArchitectureSkeleton.Web/             # Blazor Server : UI de gestion des commandes (client HTTP, ne dépend que de Contracts)
 tests/                                       # un projet de tests par niveau, même découpage en slices côté Application.Tests
 ```
 

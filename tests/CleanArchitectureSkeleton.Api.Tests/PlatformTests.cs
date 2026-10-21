@@ -1,5 +1,6 @@
 using System.Net;
 using CleanArchitectureSkeleton.Application.Orders;
+using CleanArchitectureSkeleton.Contracts.Orders;
 using CleanArchitectureSkeleton.Domain.Common;
 using CleanArchitectureSkeleton.Domain.Orders;
 using Microsoft.Extensions.DependencyInjection;

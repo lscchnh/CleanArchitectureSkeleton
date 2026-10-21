@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using CleanArchitectureSkeleton.Application.Orders;
+using CleanArchitectureSkeleton.Contracts.Orders;
 using CleanArchitectureSkeleton.Domain.Orders;
 using Microsoft.AspNetCore.Mvc;
 

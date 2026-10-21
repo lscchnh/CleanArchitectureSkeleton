@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CleanArchitectureSkeleton.Application\CleanArchitectureSkeleton.Application.csproj" />
+    <ProjectReference Include="..\CleanArchitectureSkeleton.Contracts\CleanArchitectureSkeleton.Contracts.csproj" />
     <ProjectReference Include="..\CleanArchitectureSkeleton.Infrastructure\CleanArchitectureSkeleton.Infrastructure.csproj" />
     <ProjectReference Include="..\CleanArchitectureSkeleton.ServiceDefaults\CleanArchitectureSkeleton.ServiceDefaults.csproj" />
   </ItemGroup>

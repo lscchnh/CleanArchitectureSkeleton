@@ -1,6 +1,6 @@
 using CleanArchitectureSkeleton.Domain.Orders;
 
-namespace CleanArchitectureSkeleton.Application.Orders;
+namespace CleanArchitectureSkeleton.Contracts.Orders;
 
 // DTO = Data Transfer Object. On n'expose JAMAIS les entités du Domain à l'extérieur :
 // le contrat de l'API (DTO) peut ainsi évoluer indépendamment du modèle métier.

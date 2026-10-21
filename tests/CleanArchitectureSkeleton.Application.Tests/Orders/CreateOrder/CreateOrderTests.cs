@@ -1,4 +1,5 @@
 using CleanArchitectureSkeleton.Application.Orders;
+using CleanArchitectureSkeleton.Contracts.Orders;
 using CleanArchitectureSkeleton.Domain.Orders;
 
 namespace CleanArchitectureSkeleton.Application.Tests.Orders;

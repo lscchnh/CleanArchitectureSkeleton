@@ -8,8 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Réutilise les DTOs et le enum OrderStatus de l'Application : le contrat de l'API ne doit pas être redupliqué à la main. -->
-    <ProjectReference Include="..\CleanArchitectureSkeleton.Application\CleanArchitectureSkeleton.Application.csproj" />
+    <!--
+      Le Web ne référence PAS Application : ce serait coupler la présentation aux ports/à l'orchestration
+      internes du serveur (IOrderService, IUnitOfWork...) qui n'ont aucun sens côté client HTTP.
+      Il ne dépend que du contrat public (Contracts) et du Domain (OrderStatus, simple enum sans
+      dépendance technique) : le contrat de l'API ne doit pas être redupliqué à la main, mais il ne doit
+      pas non plus entraîner avec lui toute la couche applicative.
+    -->
+    <ProjectReference Include="..\CleanArchitectureSkeleton.Contracts\CleanArchitectureSkeleton.Contracts.csproj" />
+    <ProjectReference Include="..\CleanArchitectureSkeleton.Domain\CleanArchitectureSkeleton.Domain.csproj" />
     <ProjectReference Include="..\CleanArchitectureSkeleton.ServiceDefaults\CleanArchitectureSkeleton.ServiceDefaults.csproj" />
   </ItemGroup>
 

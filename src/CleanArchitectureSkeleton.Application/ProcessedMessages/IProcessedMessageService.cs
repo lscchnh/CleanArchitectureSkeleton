@@ -1,3 +1,5 @@
+using CleanArchitectureSkeleton.Contracts.ProcessedMessages;
+
 namespace CleanArchitectureSkeleton.Application.ProcessedMessages;
 
 /// <summary>

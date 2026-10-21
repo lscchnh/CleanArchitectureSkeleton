@@ -129,6 +129,17 @@ button:disabled {
     font-weight: 600;
 }
 
+.muted {
+    color: #656d76;
+    font-size: 0.9rem;
+}
+
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.8rem;
+    word-break: break-all;
+}
+
 td.actions button {
     font-size: 0.85rem;
 }

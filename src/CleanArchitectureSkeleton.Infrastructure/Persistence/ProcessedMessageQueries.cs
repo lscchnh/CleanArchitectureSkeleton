@@ -1,5 +1,5 @@
 using CleanArchitectureSkeleton.Application.Abstractions;
-using CleanArchitectureSkeleton.Application.ProcessedMessages;
+using CleanArchitectureSkeleton.Contracts.ProcessedMessages;
 using Microsoft.EntityFrameworkCore;
 
 namespace CleanArchitectureSkeleton.Infrastructure.Persistence;

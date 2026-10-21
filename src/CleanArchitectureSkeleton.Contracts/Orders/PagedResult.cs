@@ -1,4 +1,4 @@
-namespace CleanArchitectureSkeleton.Application.Orders;
+namespace CleanArchitectureSkeleton.Contracts.Orders;
 
 // Partagé par toutes les slices de LECTURE qui paginent (aujourd'hui : ListOrders uniquement).
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount)

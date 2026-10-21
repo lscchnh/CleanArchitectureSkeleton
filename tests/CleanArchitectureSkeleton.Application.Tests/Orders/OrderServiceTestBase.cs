@@ -1,5 +1,6 @@
 using CleanArchitectureSkeleton.Application.Orders;
 using CleanArchitectureSkeleton.Application.Tests.Fakes;
+using CleanArchitectureSkeleton.Contracts.Orders;
 
 namespace CleanArchitectureSkeleton.Application.Tests.Orders;
 

@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\CleanArchitectureSkeleton.Application\CleanArchitectureSkeleton.Application.csproj" />
     <ProjectReference Include="..\..\src\CleanArchitectureSkeleton.Infrastructure\CleanArchitectureSkeleton.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\CleanArchitectureSkeleton.Api\CleanArchitectureSkeleton.Api.csproj" />
+    <ProjectReference Include="..\..\src\CleanArchitectureSkeleton.Web\CleanArchitectureSkeleton.Web.csproj" />
   </ItemGroup>
 
 </Project>

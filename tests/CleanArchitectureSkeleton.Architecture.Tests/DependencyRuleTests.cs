@@ -23,7 +23,10 @@ public class DependencyRuleTests
     private static readonly Assembly Domain = typeof(Order).Assembly;
     private static readonly Assembly Application = typeof(IOrderService).Assembly;
     private static readonly Assembly Infrastructure = typeof(Infrastructure.DependencyInjection).Assembly;
-    private static readonly Assembly Api = typeof(Program).Assembly;
+    // NB : pas typeof(Program) — Api ET Web ont chacun une classe Program générée par leurs top-level
+    // statements ; dès que les deux assemblies sont référencées ici, le type est ambigu (CS0433).
+    private static readonly Assembly Api = typeof(Api.Endpoints.OrderEndpoints).Assembly;
+    private static readonly Assembly Web = typeof(Web.Components.App).Assembly;
 
     private static void AssertNoDependencies(Assembly assembly, params string[] forbidden)
     {
@@ -44,6 +47,15 @@ public class DependencyRuleTests
         AssertNoDependencies(Application,
             InfrastructureNs, ApiNs,
             "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "Npgsql", "Polly");
+
+    [Fact]
+    public void Web_does_not_depend_on_the_application_layer()
+    {
+        // Le Web n'est qu'un CLIENT HTTP de l'Api : il ne doit connaître que le contrat public (Contracts),
+        // jamais les ports ou l'orchestration internes au serveur (IOrderService, IUnitOfWork, ICacheService...),
+        // qui n'ont aucun sens hors du processus qui héberge l'Api.
+        AssertNoDependencies(Web, ApplicationNs, InfrastructureNs);
+    }
 
     [Fact]
     public void Infrastructure_does_not_depend_on_the_presentation_layer() =>

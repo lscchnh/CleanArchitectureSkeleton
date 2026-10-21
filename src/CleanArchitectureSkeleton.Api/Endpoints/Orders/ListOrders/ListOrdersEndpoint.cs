@@ -1,5 +1,6 @@
 using CleanArchitectureSkeleton.Api.Extensions;
 using CleanArchitectureSkeleton.Application.Orders;
+using CleanArchitectureSkeleton.Contracts.Orders;
 using CleanArchitectureSkeleton.Domain.Orders;
 using Microsoft.AspNetCore.Mvc;
 

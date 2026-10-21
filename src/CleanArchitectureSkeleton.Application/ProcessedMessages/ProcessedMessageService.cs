@@ -1,4 +1,5 @@
 using CleanArchitectureSkeleton.Application.Abstractions;
+using CleanArchitectureSkeleton.Contracts.ProcessedMessages;
 
 namespace CleanArchitectureSkeleton.Application.ProcessedMessages;
 

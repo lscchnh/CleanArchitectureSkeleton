@@ -3,6 +3,7 @@
     <Project Path="src/CleanArchitectureSkeleton.Api/CleanArchitectureSkeleton.Api.csproj" />
     <Project Path="src/CleanArchitectureSkeleton.AppHost/CleanArchitectureSkeleton.AppHost.csproj" />
     <Project Path="src/CleanArchitectureSkeleton.Application/CleanArchitectureSkeleton.Application.csproj" />
+    <Project Path="src/CleanArchitectureSkeleton.Contracts/CleanArchitectureSkeleton.Contracts.csproj" />
     <Project Path="src/CleanArchitectureSkeleton.Domain/CleanArchitectureSkeleton.Domain.csproj" />
     <Project Path="src/CleanArchitectureSkeleton.Infrastructure/CleanArchitectureSkeleton.Infrastructure.csproj" />
     <Project Path="src/CleanArchitectureSkeleton.ServiceDefaults/CleanArchitectureSkeleton.ServiceDefaults.csproj" />

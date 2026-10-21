@@ -1,3 +1,4 @@
+using CleanArchitectureSkeleton.Contracts.Orders;
 using CleanArchitectureSkeleton.Domain.Orders;
 
 namespace CleanArchitectureSkeleton.Application.Orders;

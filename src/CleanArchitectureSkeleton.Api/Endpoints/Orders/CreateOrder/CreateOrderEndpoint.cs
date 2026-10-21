@@ -1,5 +1,6 @@
 using CleanArchitectureSkeleton.Api.Extensions;
 using CleanArchitectureSkeleton.Application.Orders;
+using CleanArchitectureSkeleton.Contracts.Orders;
 
 namespace CleanArchitectureSkeleton.Api.Endpoints;
 

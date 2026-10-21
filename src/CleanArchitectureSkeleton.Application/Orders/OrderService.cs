@@ -1,4 +1,5 @@
 using CleanArchitectureSkeleton.Application.Abstractions;
+using CleanArchitectureSkeleton.Contracts.Orders;
 using CleanArchitectureSkeleton.Domain.Common;
 using CleanArchitectureSkeleton.Domain.Orders;
 

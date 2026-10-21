@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Contrat public (DTOs HTTP) de l'Api : la frontière réellement partagée entre un backend (Api) et
+    N'IMPORTE QUEL client (Web Blazor, un futur client mobile, des tests...). Volontairement un projet
+    À PART de l'Application : un client ne devrait dépendre QUE de ce qui circule sur le fil (DTOs),
+    jamais des ports/orchestration internes (IOrderService, IUnitOfWork, ICacheService...) qui n'ont
+    aucun sens hors du processus serveur. Référence Domain uniquement pour OrderStatus (un simple enum,
+    sans comportement ni dépendance technique) : partager ce vocabulaire reste dans le sens de la règle
+    de dépendance (Domain est le cœur, tout le monde peut en dépendre).
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\CleanArchitectureSkeleton.Domain\CleanArchitectureSkeleton.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+</Project>

@@ -1,4 +1,5 @@
 using CleanArchitectureSkeleton.Application.ProcessedMessages;
+using CleanArchitectureSkeleton.Contracts.ProcessedMessages;
 
 namespace CleanArchitectureSkeleton.Api.Endpoints;
 

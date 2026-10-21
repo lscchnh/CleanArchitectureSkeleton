@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CleanArchitectureSkeleton.Domain\CleanArchitectureSkeleton.Domain.csproj" />
+    <!-- Les DTOs (contrat HTTP) vivent dans Contracts, pas dans Application : OrderService les produit/consomme. -->
+    <ProjectReference Include="..\CleanArchitectureSkeleton.Contracts\CleanArchitectureSkeleton.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

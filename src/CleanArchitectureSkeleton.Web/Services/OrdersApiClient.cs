@@ -1,7 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using CleanArchitectureSkeleton.Application.Orders;
+using CleanArchitectureSkeleton.Contracts.Orders;
+using CleanArchitectureSkeleton.Contracts.ProcessedMessages;
 using CleanArchitectureSkeleton.Domain.Orders;
 using Microsoft.AspNetCore.Mvc;
 
@@ -48,6 +49,14 @@ public sealed class OrdersApiClient(HttpClient httpClient)
         {
             throw new OrdersApiException(await ReadProblemDetailAsync(response, ct));
         }
+    }
+
+    /// <summary>Derniers events déjà consommés (de façon idempotente) par l'OutboxConsumer côté Infrastructure.</summary>
+    public async Task<IReadOnlyList<ProcessedMessageDto>> ListProcessedMessagesAsync(int count = 20, CancellationToken ct = default)
+    {
+        var result = await httpClient.GetFromJsonAsync<IReadOnlyList<ProcessedMessageDto>>(
+            $"/api/processed-messages?count={count}", JsonOptions, ct);
+        return result ?? [];
     }
 
     private static async Task<OrderDto> SendAsync(Func<Task<HttpResponseMessage>> send)

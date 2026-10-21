@@ -1,7 +1,9 @@
 @page "/"
-@using CleanArchitectureSkeleton.Application.Orders
+@using CleanArchitectureSkeleton.Contracts.Orders
+@using CleanArchitectureSkeleton.Contracts.ProcessedMessages
 @using CleanArchitectureSkeleton.Domain.Orders
 @using CleanArchitectureSkeleton.Web.Services
+@implements IDisposable
 @inject OrdersApiClient Api
 
 <PageTitle>Commandes</PageTitle>
@@ -102,17 +104,91 @@ else
     </table>
 }
 
+<h2>Derniers events consommés (Kafka)</h2>
+<p class="muted">
+    Events déjà écrits dans l'Outbox par l'Api, publiés sur Kafka, puis consommés de façon idempotente par
+    l'<code>OutboxConsumer</code> (Infrastructure) — table <code>ProcessedMessages</code>. Rafraîchi automatiquement
+    toutes les 5 secondes.
+</p>
+
+@if (processedMessages is null)
+{
+    <p>Chargement…</p>
+}
+else if (processedMessages.Count == 0)
+{
+    <p>Aucun event consommé pour le moment.</p>
+}
+else
+{
+    <table class="processed-messages">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Contenu</th>
+                <th>Traité le</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var message in processedMessages)
+            {
+                <tr>
+                    <td>@message.Type</td>
+                    <td class="mono">@message.Content</td>
+                    <td>@message.ProcessedOnUtc.LocalDateTime.ToString("g")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
 @code {
     private PagedResult<OrderDto>? orders;
+    private IReadOnlyList<ProcessedMessageDto>? processedMessages;
     private string? errorMessage;
     private bool isSubmitting;
     private NewOrderModel newOrder = new();
+    private readonly CancellationTokenSource disposalCts = new();
 
-    protected override Task OnInitializedAsync() => LoadOrdersAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrdersAsync();
+        await LoadProcessedMessagesAsync();
+        _ = PollProcessedMessagesAsync();
+    }
 
     private async Task LoadOrdersAsync()
     {
         orders = await Api.ListAsync(page: 1, pageSize: 50, status: null);
+    }
+
+    private async Task LoadProcessedMessagesAsync()
+    {
+        processedMessages = await Api.ListProcessedMessagesAsync(20);
+    }
+
+    /// <summary>Boucle de polling en tâche de fond : le consumer Kafka écrit côté serveur, cette page n'a aucun moyen d'être notifiée par push.</summary>
+    private async Task PollProcessedMessagesAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(disposalCts.Token))
+            {
+                await LoadProcessedMessagesAsync();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Composant détruit (navigation ailleurs) : arrêt silencieux du polling.
+        }
+    }
+
+    public void Dispose()
+    {
+        disposalCts.Cancel();
+        disposalCts.Dispose();
     }
 
     private async Task CreateOrderAsync()
